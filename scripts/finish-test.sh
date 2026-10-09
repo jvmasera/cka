@@ -79,21 +79,47 @@ else
   TIME_STATUS="within the 2h CKA time limit"
 fi
 
-TOTAL=0
+# Build the set of questions actually attempted in this session.
+declare -A ATTEMPTED=()
+while IFS= read -r QUESTION_DIR; do
+  [[ -z "$QUESTION_DIR" ]] && continue
+  [[ -d "$QUESTION_DIR" ]] || continue
+  ATTEMPTED["$QUESTION_DIR"]=1
+done < "$LOG_FILE"
+
+# The CKA real exam always has the same number of questions (currently 17),
+# so the score must be computed over ALL questions, not only the ones you
+# attempted in this session. Any question not attempted counts as wrong.
+ALL_QUESTIONS=()
+for QUESTION_DIR in "$REPO_ROOT"/Question-*/; do
+  QUESTION_DIR="$(basename "$QUESTION_DIR")"
+  ALL_QUESTIONS+=("$QUESTION_DIR")
+done
+
+TOTAL=${#ALL_QUESTIONS[@]}
+ATTEMPTED_COUNT=${#ATTEMPTED[@]}
 CORRECT=0
 declare -a CORRECT_LIST=()
 declare -a WRONG_LIST=()
 declare -a WRONG_REASONS=()
 declare -a WRONG_DOMAINS=()
 
-while IFS= read -r QUESTION_DIR; do
-  [[ -z "$QUESTION_DIR" ]] && continue
-  [[ -d "$QUESTION_DIR" ]] || continue
+if [[ "$TOTAL" -eq 0 ]]; then
+  echo "No valid questions found to grade." >&2
+  exit 1
+fi
 
-  TOTAL=$((TOTAL + 1))
+for QUESTION_DIR in "${ALL_QUESTIONS[@]}"; do
   VERIFY="$REPO_ROOT/$QUESTION_DIR/Verify.bash"
   DOMAIN="${QUESTION_DOMAIN[$QUESTION_DIR]:-Unknown}"
   DOMAIN_TOTAL["$DOMAIN"]=$(( ${DOMAIN_TOTAL["$DOMAIN"]:-0} + 1 ))
+
+  if [[ -z "${ATTEMPTED[$QUESTION_DIR]:-}" ]]; then
+    WRONG_LIST+=("$QUESTION_DIR")
+    WRONG_REASONS+=("  - Not attempted during this session.")
+    WRONG_DOMAINS+=("$DOMAIN")
+    continue
+  fi
 
   if [[ ! -f "$VERIFY" ]]; then
     WRONG_LIST+=("$QUESTION_DIR")
@@ -120,12 +146,7 @@ while IFS= read -r QUESTION_DIR; do
       WRONG_REASONS+=("  - Verification failed (no detailed reason returned).")
     fi
   fi
-done < "$LOG_FILE"
-
-if [[ "$TOTAL" -eq 0 ]]; then
-  echo "No valid questions found to grade." >&2
-  exit 1
-fi
+done
 
 PERCENT=$(( CORRECT * 100 / TOTAL ))
 
@@ -134,9 +155,10 @@ echo "                CKA PRACTICE RESULTS"
 echo "=================================================="
 echo "Time elapsed:         $ELAPSED_FMT ($TIME_STATUS)"
 echo "Time limit:           02:00:00 (CKA exam duration)"
-echo "Questions attempted: $TOTAL"
-echo "Correct answers:     $CORRECT"
-echo "Score:                $PERCENT%"
+echo "Total exam questions: $TOTAL"
+echo "Questions attempted:  $ATTEMPTED_COUNT"
+echo "Correct answers:      $CORRECT"
+echo "Score:                 $PERCENT%  ($CORRECT/$TOTAL)"
 echo "Passing score:        $PASSING_SCORE% (official CKA minimum to pass)"
 echo "--------------------------------------------------"
 if [[ "$PERCENT" -ge "$PASSING_SCORE" ]]; then

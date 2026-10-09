@@ -148,4 +148,17 @@ if [[ ! -f "$TIMER_FILE" ]]; then
   date +%s > "$TIMER_FILE"
   echo
   echo "==> Timer started! You have 2h (CKA exam duration) to finish the session."
+
+  # Try to automatically open the fixed on-screen timer in a new tmux pane,
+  # so you don't need to run show-timer.sh manually. Only works when already
+  # inside a tmux session; otherwise just hint the manual command.
+  SHOW_TIMER="$REPO_ROOT/scripts/show-timer.sh"
+  chmod +x "$SHOW_TIMER" 2>/dev/null || true
+  if [[ -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
+    tmux split-window -h "$SHOW_TIMER" 2>/dev/null \
+      && echo "==> Timer window opened automatically (tmux split-window)." \
+      || echo "==> Could not auto-open the timer window. Run manually: $SHOW_TIMER"
+  else
+    echo "==> To keep the timer fixed on screen, run in another terminal/pane: $SHOW_TIMER"
+  fi
 fi
