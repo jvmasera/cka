@@ -93,8 +93,16 @@ reset_cluster() {
     fi
   fi
 
-  # 5. Clean up temporary files in root / home
+  # 5. Clean up temporary files in root / home and sandbox
   rm -f ~/mariadb-deploy.yaml ~/pvc.yaml ~/pod.yaml ~/hpa.yaml /root/mariadb-deploy.yaml /root/cri-dockerd.deb 2>/dev/null || true
+  
+  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  if [[ -d "$REPO_ROOT/sandbox" ]]; then
+    echo "Cleaning up sandbox folder..."
+    find "$REPO_ROOT/sandbox" -mindepth 1 ! -name '.gitkeep' -delete 2>/dev/null || true
+  else
+    mkdir -p "$REPO_ROOT/sandbox"
+  fi
 
   echo "==> Cluster reset complete."
 }
