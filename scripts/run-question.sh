@@ -2,11 +2,33 @@
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
-  echo "Usage: scripts/run-question.sh \"Question-XX Topic\"" >&2
+  echo "Usage: scripts/run-question.sh <number|Question-XX Topic>" >&2
   exit 1
 fi
 
-QUESTION_DIR="$*"
+INPUT="$*"
+QUESTION_DIR=""
+
+if [[ "$INPUT" =~ ^[0-9]+$ ]]; then
+  FOUND_DIRS=()
+  for dir in Question-"$INPUT"*; do
+    if [[ -d "$dir" && "$dir" =~ ^Question-${INPUT}([[:space:]]|-|$) ]]; then
+      FOUND_DIRS+=("$dir")
+    fi
+  done
+
+  if [[ ${#FOUND_DIRS[@]} -eq 1 ]]; then
+    QUESTION_DIR="${FOUND_DIRS[0]}"
+  elif [[ ${#FOUND_DIRS[@]} -gt 1 ]]; then
+    echo "Multiple question directories found for '$INPUT': ${FOUND_DIRS[*]}" >&2
+    exit 1
+  fi
+fi
+
+if [[ -z "$QUESTION_DIR" ]]; then
+  QUESTION_DIR="$INPUT"
+fi
+
 if [[ ! -d "$QUESTION_DIR" ]]; then
   echo "Question directory '$QUESTION_DIR' not found" >&2
   exit 1
