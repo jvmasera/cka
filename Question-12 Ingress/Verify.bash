@@ -34,7 +34,7 @@ if [ $? -ne 0 ]; then
     REASONS+=("REASON: Ingress $ING_NAME not found in namespace $NS")
 else
     HOST=$(echo "$ING_STATUS" | jq -r '.spec.rules[0].host')
-    PATH=$(echo "$ING_STATUS" | jq -r '.spec.rules[0].http.paths[0].path')
+    ING_PATH=$(echo "$ING_STATUS" | jq -r '.spec.rules[0].http.paths[0].path')
     BACKEND_SVC=$(echo "$ING_STATUS" | jq -r '.spec.rules[0].http.paths[0].backend.service.name')
     BACKEND_PORT=$(echo "$ING_STATUS" | jq -r '.spec.rules[0].http.paths[0].backend.service.port.number')
     
@@ -42,9 +42,9 @@ else
         PASS=false
         REASONS+=("REASON: Ingress host is $HOST, expected example.org")
     fi
-    if [ "$PATH" != "/echo" ]; then
+    if [ "$ING_PATH" != "/echo" ]; then
         PASS=false
-        REASONS+=("REASON: Ingress path is $PATH, expected /echo")
+        REASONS+=("REASON: Ingress path is $ING_PATH, expected /echo")
     fi
     if [ "$BACKEND_SVC" != "$SVC_NAME" ]; then
         PASS=false
