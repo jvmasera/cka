@@ -6,15 +6,18 @@
 #   ./install.sh
 #
 # After this, you can run from any directory:
-#   cka 1        -> runs scripts/run-question.sh 1
-#   cka finish   -> runs scripts/finish-test.sh
+#   cka 1          -> runs scripts/run-question.sh 1
+#   cka finish     -> runs scripts/finish-test.sh
+#   cka gabaritar  -> runs scripts/gabaritar.sh (auto-solves every question
+#                     with its own SolutionNotes.bash, then grades them, to
+#                     sanity-check Verify.bash + the session cache)
 
 set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="/usr/bin/cka"
 
-chmod +x "$REPO_ROOT/scripts/run-question.sh" "$REPO_ROOT/scripts/finish-test.sh" "$REPO_ROOT/scripts/show-timer.sh" 2>/dev/null || true
+chmod +x "$REPO_ROOT/scripts/run-question.sh" "$REPO_ROOT/scripts/finish-test.sh" "$REPO_ROOT/scripts/show-timer.sh" "$REPO_ROOT/scripts/gabaritar.sh" 2>/dev/null || true
 
 # /usr/bin is usually only writable by root. Killercoda sessions normally
 # run as root already; locally, re-run this script with sudo if needed.
@@ -36,6 +39,9 @@ REPO_ROOT="$REPO_ROOT"
 if [[ "\$1" == "finish" ]]; then
   shift
   exec "\$REPO_ROOT/scripts/finish-test.sh" "\$@"
+elif [[ "\$1" == "gabaritar" ]]; then
+  shift
+  exec "\$REPO_ROOT/scripts/gabaritar.sh" "\$@"
 else
   exec "\$REPO_ROOT/scripts/run-question.sh" "\$@"
 fi
@@ -46,3 +52,4 @@ chmod +x "$TARGET"
 echo "==> 'cka' command installed at $TARGET"
 echo "    Usage: cka <question-number>   (e.g. cka 1)"
 echo "           cka finish              (ends the test and shows the score)"
+echo "           cka gabaritar           (auto-solves and grades every question, sanity-checking Verify.bash)"
