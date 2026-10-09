@@ -39,7 +39,7 @@ spec:
 EOF
 
 echo "🔹 Creating initial MariaDB Deployment..."
-cat <<EOF > ~/cka/sandbox/mariadb-deployment.yaml
+cat <<EOF > ~/cka/sandbox/mariadb-deploy.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
