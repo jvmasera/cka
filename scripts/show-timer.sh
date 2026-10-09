@@ -47,23 +47,62 @@ while true; do
 
   ELAPSED_FMT="$(printf '%02d:%02d:%02d' $((ELAPSED / 3600)) $(((ELAPSED % 3600) / 60)) $((ELAPSED % 60)))"
 
+  # Build a fixed-width progress bar showing how much of the 2h exam time has
+  # elapsed, with the remaining time printed inside the bar itself.
+  BAR_WIDTH=40
+  PERCENT_ELAPSED=$((ELAPSED * 100 / EXAM_DURATION_SECONDS))
+  [[ "$PERCENT_ELAPSED" -gt 100 ]] && PERCENT_ELAPSED=100
+  [[ "$PERCENT_ELAPSED" -lt 0 ]] && PERCENT_ELAPSED=0
+  FILLED=$((PERCENT_ELAPSED * BAR_WIDTH / 100))
+  EMPTY=$((BAR_WIDTH - FILLED))
+
   if [[ "$REMAINING" -le 0 ]]; then
     REMAINING_ABS=$((-REMAINING))
     REMAINING_FMT="$(printf '%02d:%02d:%02d' $((REMAINING_ABS / 3600)) $(((REMAINING_ABS % 3600) / 60)) $((REMAINING_ABS % 60)))"
-    echo
-    echo -e "${BLUE}Elapsed:${RESET}   ${BOLD}$ELAPSED_FMT${RESET}"
-    echo -e "${RED}Overtime:  +$REMAINING_FMT  (over the 2h CKA time limit!)${RESET}"
+    BAR_COLOR="$RED"
+    BAR_LABEL="+$REMAINING_FMT over"
   else
     REMAINING_FMT="$(printf '%02d:%02d:%02d' $((REMAINING / 3600)) $(((REMAINING % 3600) / 60)) $((REMAINING % 60)))"
-    echo
-    echo -e "${BLUE}Elapsed:${RESET}   ${BOLD}$ELAPSED_FMT${RESET}"
     if [[ "$REMAINING" -le 600 ]]; then
-      echo -e "${RED}Remaining: $REMAINING_FMT  (of the 2h CKA time limit)${RESET}"
+      BAR_COLOR="$RED"
     elif [[ "$REMAINING" -le 1800 ]]; then
-      echo -e "${YELLOW}Remaining: $REMAINING_FMT  (of the 2h CKA time limit)${RESET}"
+      BAR_COLOR="$YELLOW"
     else
-      echo -e "${GREEN}Remaining: $REMAINING_FMT  (of the 2h CKA time limit)${RESET}"
+      BAR_COLOR="$GREEN"
     fi
+    BAR_LABEL="$REMAINING_FMT left"
+  fi
+
+  # Center the "time left" label inside the bar's total width.
+  LABEL_LEN=${#BAR_LABEL}
+  PAD_TOTAL=$((BAR_WIDTH - LABEL_LEN))
+  [[ "$PAD_TOTAL" -lt 0 ]] && PAD_TOTAL=0
+  PAD_LEFT=$((PAD_TOTAL / 2))
+  PAD_RIGHT=$((PAD_TOTAL - PAD_LEFT))
+
+  BAR_FULL="$(printf '%0.s#' $(seq 1 "$FILLED" 2>/dev/null))"
+  BAR_VOID="$(printf '%0.s-' $(seq 1 "$EMPTY" 2>/dev/null))"
+  BAR_RAW="${BAR_FULL}${BAR_VOID}"
+  BAR_WITH_LABEL="$(printf '%*s%s%*s' "$PAD_LEFT" '' "$BAR_LABEL" "$PAD_RIGHT" '')"
+  # Overlay the centered label on top of the raw bar characters so the bar
+  # itself still shows the fill/empty proportion around the text.
+  BAR_DISPLAY=""
+  for ((i = 0; i < BAR_WIDTH; i++)); do
+    CH_LABEL="${BAR_WITH_LABEL:$i:1}"
+    if [[ -n "$CH_LABEL" && "$CH_LABEL" != " " ]]; then
+      BAR_DISPLAY+="$CH_LABEL"
+    else
+      BAR_DISPLAY+="${BAR_RAW:$i:1}"
+    fi
+  done
+
+  echo
+  echo -e "${BLUE}Elapsed:${RESET}   ${BOLD}$ELAPSED_FMT${RESET}  /  02:00:00 (CKA exam duration)"
+  echo -e "${BAR_COLOR}[${BAR_DISPLAY}] ${PERCENT_ELAPSED}%${RESET}"
+  if [[ "$REMAINING" -le 0 ]]; then
+    echo -e "${RED}Overtime:  +$REMAINING_FMT  (over the 2h CKA time limit!)${RESET}"
+  else
+    echo -e "${BAR_COLOR}Remaining: $REMAINING_FMT  (of the 2h CKA time limit)${RESET}"
   fi
 
   echo -e "${CYAN}==================================================${RESET}"
