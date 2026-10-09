@@ -1,5 +1,5 @@
 # Add shared volume + sidecar to deployment
-kubectl edit deployment wordpress   # add emptyDir volume and mounts below
+# kubectl edit deployment wordpress   # add emptyDir volume and mounts below (shown here non-interactively via kubectl apply)
 # spec.template.spec.volumes:
 # - name: log
 #   emptyDir: {}
