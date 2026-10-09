@@ -15,6 +15,13 @@ else
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Always operate from the repo root, regardless of the directory the user was
+# in when invoking "cka finish" (e.g. from inside "sandbox/" or any other
+# folder). Without this, the "-d $QUESTION_DIR" checks below (which use the
+# relative paths stored in .session_log) would fail to find any question
+# directory, causing every attempted question to be wrongly reported as
+# "Not attempted during this session."
+cd "$REPO_ROOT"
 LOG_FILE="$REPO_ROOT/scripts/.session_log"
 TIMER_FILE="$REPO_ROOT/scripts/.session_start"
 RESULTS_FILE="$REPO_ROOT/scripts/.session_results"
