@@ -13,8 +13,10 @@
 # finish-test.sh to confirm everything still grades correctly end-to-end.
 #
 # Usage:
-#   scripts/gabaritar.sh          (or: cka gabaritar)        -> solves ALL questions
-#   scripts/gabaritar.sh <number>  (or: cka gabaritar <number>) -> solves and grades ONLY that question
+#   scripts/gabaritar.sh              (or: cka gabaritar)             -> solves ALL questions
+#   scripts/gabaritar.sh <number>      (or: cka gabaritar <number>)     -> solves and grades ONLY that question
+#   scripts/gabaritar.sh <N>-<M>       (or: cka gabaritar 1-2)          -> solves and grades a range of questions
+#   scripts/gabaritar.sh <N>,<M>,...   (or: cka gabaritar 1,3,5)        -> solves and grades a comma-separated list
 
 set -uo pipefail
 
@@ -48,25 +50,64 @@ if [[ ${#ALL_QUESTION_DIRS[@]} -eq 0 ]]; then
   exit 1
 fi
 
-# If a specific question number (or full directory name) is given as an
-# argument, restrict this run to just that single question instead of the
-# whole exam, e.g. "cka gabaritar 15" solves and grades only Question-15.
+# If a specific question number, a range ("1-2"), a comma-separated list
+# ("1,3,5"), or a full directory name is given as an argument, restrict this
+# run to just those questions instead of the whole exam, e.g.
+# "cka gabaritar 15" solves and grades only Question-15, and
+# "cka gabaritar 1-2" solves and grades Question-1 then Question-2.
 SINGLE_ARG="${1:-}"
-QUESTION_DIRS=()
-if [[ -n "$SINGLE_ARG" ]]; then
+
+# Resolve a single token (plain number or full directory name) to its
+# matching directory name(s) in ALL_QUESTION_DIRS, appended to QUESTION_DIRS,
+# preserving the exam's numeric order and without duplicates.
+resolve_token() {
+  local token="$1" dir found=0
   for dir in "${ALL_QUESTION_DIRS[@]}"; do
-    if [[ "$SINGLE_ARG" =~ ^[0-9]+$ ]]; then
-      if [[ "$dir" =~ ^Question-${SINGLE_ARG}([[:space:]]|-|$) ]]; then
+    if [[ "$token" =~ ^[0-9]+$ ]]; then
+      if [[ "$dir" =~ ^Question-${token}([[:space:]]|-|$) ]]; then
+        found=1
+        if [[ ! " ${QUESTION_DIRS[*]:-} " == *" $dir "* ]]; then
+          QUESTION_DIRS+=("$dir")
+        fi
+      fi
+    elif [[ "$dir" == "$token" ]]; then
+      found=1
+      if [[ ! " ${QUESTION_DIRS[*]:-} " == *" $dir "* ]]; then
         QUESTION_DIRS+=("$dir")
       fi
-    elif [[ "$dir" == "$SINGLE_ARG" ]]; then
-      QUESTION_DIRS+=("$dir")
     fi
   done
-  if [[ ${#QUESTION_DIRS[@]} -eq 0 ]]; then
-    echo -e "${RED}No question directory found matching '$SINGLE_ARG'.${RESET}" >&2
-    exit 1
-  fi
+  [[ $found -eq 1 ]]
+}
+
+QUESTION_DIRS=()
+if [[ -n "$SINGLE_ARG" ]]; then
+  # Split by comma first, so "1-2,5" or "1,3,5" both work; each piece can
+  # itself be a plain number, a range "N-M", or a full directory name.
+  IFS=',' read -r -a TOKENS <<< "$SINGLE_ARG"
+  for token in "${TOKENS[@]}"; do
+    token="$(echo "$token" | xargs)"   # trim whitespace
+    [[ -z "$token" ]] && continue
+    if [[ "$token" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+      RANGE_START="${BASH_REMATCH[1]}"
+      RANGE_END="${BASH_REMATCH[2]}"
+      if [[ "$RANGE_START" -gt "$RANGE_END" ]]; then
+        echo -e "${RED}Invalid range '$token': start is greater than end.${RESET}" >&2
+        exit 1
+      fi
+      for ((n = RANGE_START; n <= RANGE_END; n++)); do
+        if ! resolve_token "$n"; then
+          echo -e "${RED}No question directory found matching '$n' (from range '$token').${RESET}" >&2
+          exit 1
+        fi
+      done
+    else
+      if ! resolve_token "$token"; then
+        echo -e "${RED}No question directory found matching '$token'.${RESET}" >&2
+        exit 1
+      fi
+    fi
+  done
 else
   QUESTION_DIRS=("${ALL_QUESTION_DIRS[@]}")
 fi
@@ -74,8 +115,11 @@ fi
 if [[ ${#QUESTION_DIRS[@]} -eq ${#ALL_QUESTION_DIRS[@]} ]]; then
   echo -e "${BOLD}${BLUE}==> cka gabaritar: solving all ${#QUESTION_DIRS[@]} questions with their own SolutionNotes.bash, then running finish-test.sh${RESET}"
   echo -e "${YELLOW}This is meant to sanity-check Verify.bash + the session cache; a correct run should score 100%.${RESET}"
-else
+elif [[ ${#QUESTION_DIRS[@]} -eq 1 ]]; then
   echo -e "${BOLD}${BLUE}==> cka gabaritar: solving only '${QUESTION_DIRS[0]}' with its own SolutionNotes.bash, then running finish-test.sh${RESET}"
+  echo -e "${YELLOW}Note: finish-test.sh always grades over all 17 exam questions, so any question not solved in this run will still count as 'Not attempted'.${RESET}"
+else
+  echo -e "${BOLD}${BLUE}==> cka gabaritar: solving ${#QUESTION_DIRS[@]} selected questions (${QUESTION_DIRS[*]}) with their own SolutionNotes.bash, then running finish-test.sh${RESET}"
   echo -e "${YELLOW}Note: finish-test.sh always grades over all 17 exam questions, so any question not solved in this run will still count as 'Not attempted'.${RESET}"
 fi
 echo
