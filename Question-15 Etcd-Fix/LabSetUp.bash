@@ -4,8 +4,8 @@ set -e
 # Step 1: Backup current kube-apiserver manifest
 sudo cp /etc/kubernetes/manifests/kube-apiserver.yaml /root/kube-apiserver.yaml.bak
 
-# Step 2: Simulate migration issue — change etcd client port to peer port 2380
-sudo sed -i 's/:2379/:2380/g' /etc/kubernetes/manifests/kube-apiserver.yaml
+# Step 2: Simulate migration issue — change etcd IP to an incorrect IP
+sudo sed -i 's/127.0.0.1:2379/127.0.0.99:2379/g' /etc/kubernetes/manifests/kube-apiserver.yaml
 
 # Step 3: Show kube-apiserver pod status/logs
 echo "Checking kube-apiserver container..."
@@ -17,4 +17,4 @@ else
 fi
 
 # Step 4: Verify that kubectl fails as API server is down
-kubectl get nodes || echo "As expected, API server is down due to misconfigured etcd client port."
+kubectl get nodes || echo "As expected, API server is down due to misconfigured etcd IP."
