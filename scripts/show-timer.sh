@@ -15,7 +15,12 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TIMER_FILE="$REPO_ROOT/scripts/.session_start"
+PAUSE_FILE="$REPO_ROOT/scripts/.session_pause"
+PAUSED_TOTAL_FILE="$REPO_ROOT/scripts/.session_paused_total"
+RESUME_FILE="$REPO_ROOT/scripts/.session_resume"
 EXAM_DURATION_SECONDS=$((2 * 60 * 60))
+# How long the "Timer resumed!" message stays visible after a pause ends.
+RESUME_NOTICE_SECONDS=5
 
 # Colors (disabled automatically when not attached to a terminal).
 if [[ -t 1 ]]; then
@@ -41,7 +46,23 @@ while true; do
 
   START_TS="$(cat "$TIMER_FILE")"
   NOW_TS="$(date +%s)"
-  ELAPSED=$((NOW_TS - START_TS))
+
+  # Account for paused time (e.g. while the cluster resets / the question's
+  # environment is being set up) so it doesn't count against the exam clock.
+  PAUSED_TOTAL=0
+  [[ -f "$PAUSED_TOTAL_FILE" ]] && PAUSED_TOTAL="$(cat "$PAUSED_TOTAL_FILE" 2>/dev/null || echo 0)"
+  [[ -z "$PAUSED_TOTAL" ]] && PAUSED_TOTAL=0
+
+  IS_PAUSED=0
+  if [[ -f "$PAUSE_FILE" ]]; then
+    IS_PAUSED=1
+    PAUSE_START="$(cat "$PAUSE_FILE")"
+    CURRENT_PAUSE_DURATION=$((NOW_TS - PAUSE_START))
+    [[ "$CURRENT_PAUSE_DURATION" -lt 0 ]] && CURRENT_PAUSE_DURATION=0
+    PAUSED_TOTAL=$((PAUSED_TOTAL + CURRENT_PAUSE_DURATION))
+  fi
+
+  ELAPSED=$((NOW_TS - START_TS - PAUSED_TOTAL))
   [[ "$ELAPSED" -lt 0 ]] && ELAPSED=0
   REMAINING=$((EXAM_DURATION_SECONDS - ELAPSED))
 
@@ -105,6 +126,24 @@ while true; do
     echo -e "${RED}Overtime:  +$REMAINING_FMT  (over the 2h CKA time limit!)${RESET}"
   else
     echo -e "${BAR_COLOR}Remaining: $REMAINING_FMT  (of the 2h CKA time limit)${RESET}"
+  fi
+
+  # Show the pause/resume status: PAUSED while the environment is being
+  # (re)initialized, a short "RESUMED" notice right after it's ready again,
+  # or RUNNING otherwise.
+  if [[ "$IS_PAUSED" -eq 1 ]]; then
+    echo -e "${YELLOW}${BOLD}Status: PAUSED${RESET}${YELLOW} - resetting cluster / initializing question environment...${RESET}"
+  else
+    RESUME_AGE=999999
+    if [[ -f "$RESUME_FILE" ]]; then
+      RESUME_TS="$(cat "$RESUME_FILE" 2>/dev/null || echo 0)"
+      [[ -n "$RESUME_TS" ]] && RESUME_AGE=$((NOW_TS - RESUME_TS))
+    fi
+    if [[ "$RESUME_AGE" -ge 0 && "$RESUME_AGE" -le "$RESUME_NOTICE_SECONDS" ]]; then
+      echo -e "${GREEN}${BOLD}Status: RESUMED${RESET}${GREEN} - environment ready, timer is running again.${RESET}"
+    else
+      echo -e "${GREEN}Status: RUNNING${RESET}"
+    fi
   fi
 
   echo -e "${CYAN}==================================================${RESET}"

@@ -150,6 +150,9 @@ reset_cluster() {
 
 LOG_FILE="$REPO_ROOT/scripts/.session_log"
 RESULTS_FILE="$REPO_ROOT/scripts/.session_results"
+PAUSE_FILE="$REPO_ROOT/scripts/.session_pause"
+PAUSED_TOTAL_FILE="$REPO_ROOT/scripts/.session_paused_total"
+RESUME_FILE="$REPO_ROOT/scripts/.session_resume"
 
 # Reset the test session log whenever an explicit "new session" is requested,
 # i.e. when the user sets NEW_TEST_SESSION=1 before starting the first
@@ -159,6 +162,7 @@ if [[ "${NEW_TEST_SESSION:-0}" == "1" ]]; then
   rm -f "$LOG_FILE"
   rm -f "$RESULTS_FILE"
   rm -f "$REPO_ROOT/scripts/.session_start"
+  rm -f "$PAUSE_FILE" "$PAUSED_TOTAL_FILE" "$RESUME_FILE"
 fi
 
 # Before wiping the cluster below, cache the verification result of the
@@ -185,10 +189,36 @@ if [[ -s "$LOG_FILE" ]]; then
   fi
 fi
 
+# Pause the exam timer while the cluster resets and the question's
+# environment is initialized, since this setup time shouldn't count against
+# the candidate. Only do this if the timer is already running (i.e. this is
+# not the very first question, whose setup happens before the timer starts).
+if [[ -f "$TIMER_FILE" ]]; then
+  echo -e "${YELLOW}==> Pausing exam timer while the environment initializes (cluster reset + setup)...${RESET}"
+  date +%s > "$PAUSE_FILE"
+  rm -f "$RESUME_FILE"
+fi
+
 reset_cluster
 
 echo -e "${CYAN}==> Running lab setup for ${BOLD}$QUESTION_DIR${RESET}"
 "$SETUP"
+
+# Resume the exam timer now that the environment is ready, accumulating the
+# time spent paused so it keeps being excluded from the elapsed time shown
+# by show-timer.sh / finish-test.sh.
+if [[ -f "$PAUSE_FILE" ]]; then
+  PAUSE_START="$(cat "$PAUSE_FILE")"
+  PAUSE_END="$(date +%s)"
+  PAUSE_DURATION=$((PAUSE_END - PAUSE_START))
+  [[ "$PAUSE_DURATION" -lt 0 ]] && PAUSE_DURATION=0
+  PREV_PAUSED_TOTAL=0
+  [[ -f "$PAUSED_TOTAL_FILE" ]] && PREV_PAUSED_TOTAL="$(cat "$PAUSED_TOTAL_FILE")"
+  echo $((PREV_PAUSED_TOTAL + PAUSE_DURATION)) > "$PAUSED_TOTAL_FILE"
+  rm -f "$PAUSE_FILE"
+  date +%s > "$RESUME_FILE"
+  echo -e "${GREEN}==> Timer resumed! Environment is ready (paused for ${PAUSE_DURATION}s while initializing).${RESET}"
+fi
 
 echo
 echo -e "${BOLD}${BLUE}==> Question${RESET}"

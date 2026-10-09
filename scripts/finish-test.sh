@@ -18,6 +18,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_FILE="$REPO_ROOT/scripts/.session_log"
 TIMER_FILE="$REPO_ROOT/scripts/.session_start"
 RESULTS_FILE="$REPO_ROOT/scripts/.session_results"
+PAUSE_FILE="$REPO_ROOT/scripts/.session_pause"
+PAUSED_TOTAL_FILE="$REPO_ROOT/scripts/.session_paused_total"
+RESUME_FILE="$REPO_ROOT/scripts/.session_resume"
 
 # Reads a cached Verify.bash output (captured by run-question.sh right before
 # it reset the cluster for the next question) for the given question
@@ -83,11 +86,24 @@ if ! command -v kubectl >/dev/null 2>&1; then
   echo "Warning: kubectl not found, verification may be incomplete." >&2
 fi
 
-# Stop the exam timer: compute elapsed time since the first question was run.
+# Stop the exam timer: compute elapsed time since the first question was run,
+# excluding any time spent paused while the cluster reset / the environment
+# was being initialized between questions (and any pause still in progress).
 if [[ -f "$TIMER_FILE" ]]; then
   START_TS="$(cat "$TIMER_FILE")"
   END_TS="$(date +%s)"
-  ELAPSED=$((END_TS - START_TS))
+
+  PAUSED_TOTAL=0
+  [[ -f "$PAUSED_TOTAL_FILE" ]] && PAUSED_TOTAL="$(cat "$PAUSED_TOTAL_FILE" 2>/dev/null || echo 0)"
+  [[ -z "$PAUSED_TOTAL" ]] && PAUSED_TOTAL=0
+  if [[ -f "$PAUSE_FILE" ]]; then
+    PAUSE_START="$(cat "$PAUSE_FILE")"
+    ONGOING_PAUSE=$((END_TS - PAUSE_START))
+    [[ "$ONGOING_PAUSE" -lt 0 ]] && ONGOING_PAUSE=0
+    PAUSED_TOTAL=$((PAUSED_TOTAL + ONGOING_PAUSE))
+  fi
+
+  ELAPSED=$((END_TS - START_TS - PAUSED_TOTAL))
   [[ "$ELAPSED" -lt 0 ]] && ELAPSED=0
 else
   ELAPSED=0
@@ -261,3 +277,4 @@ echo
 # question.
 rm -f "$TIMER_FILE"
 rm -f "$RESULTS_FILE"
+rm -f "$PAUSE_FILE" "$PAUSED_TOTAL_FILE" "$RESUME_FILE"

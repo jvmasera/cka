@@ -3,3 +3,6 @@ Thumbs.db
 scripts/.session_log
 scripts/.session_start
 scripts/.session_results
+scripts/.session_pause
+scripts/.session_paused_total
+scripts/.session_resume
