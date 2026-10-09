@@ -47,13 +47,14 @@ while true; do
 
   ELAPSED_FMT="$(printf '%02d:%02d:%02d' $((ELAPSED / 3600)) $(((ELAPSED % 3600) / 60)) $((ELAPSED % 60)))"
 
-  # Build a fixed-width progress bar showing how much of the 2h exam time has
-  # elapsed, with the remaining time printed inside the bar itself.
+  # Build a fixed-width progress bar showing how much of the 2h exam time is
+  # still remaining, with the remaining time printed inside the bar itself.
+  # It starts full (100%) and empties out as time runs out.
   BAR_WIDTH=40
-  PERCENT_ELAPSED=$((ELAPSED * 100 / EXAM_DURATION_SECONDS))
-  [[ "$PERCENT_ELAPSED" -gt 100 ]] && PERCENT_ELAPSED=100
-  [[ "$PERCENT_ELAPSED" -lt 0 ]] && PERCENT_ELAPSED=0
-  FILLED=$((PERCENT_ELAPSED * BAR_WIDTH / 100))
+  PERCENT_REMAINING=$((REMAINING * 100 / EXAM_DURATION_SECONDS))
+  [[ "$PERCENT_REMAINING" -gt 100 ]] && PERCENT_REMAINING=100
+  [[ "$PERCENT_REMAINING" -lt 0 ]] && PERCENT_REMAINING=0
+  FILLED=$((PERCENT_REMAINING * BAR_WIDTH / 100))
   EMPTY=$((BAR_WIDTH - FILLED))
 
   if [[ "$REMAINING" -le 0 ]]; then
@@ -99,7 +100,7 @@ while true; do
 
   echo
   echo -e "${BLUE}Elapsed:${RESET}   ${BOLD}$ELAPSED_FMT${RESET}  /  02:00:00 (CKA exam duration)"
-  echo -e "${BAR_COLOR}[${BAR_DISPLAY}] ${PERCENT_ELAPSED}%${RESET}"
+  echo -e "${BAR_COLOR}[${BAR_DISPLAY}] ${PERCENT_REMAINING}%${RESET}"
   if [[ "$REMAINING" -le 0 ]]; then
     echo -e "${RED}Overtime:  +$REMAINING_FMT  (over the 2h CKA time limit!)${RESET}"
   else
