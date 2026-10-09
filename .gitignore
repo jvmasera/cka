@@ -1,2 +1,4 @@
 .DS_Store
 Thumbs.db
+scripts/.session_log
+scripts/.session_start

@@ -107,6 +107,16 @@ reset_cluster() {
   echo "==> Cluster reset complete."
 }
 
+# Reset the test session log whenever an explicit "new session" is requested,
+# i.e. when the user sets NEW_TEST_SESSION=1 before starting the first
+# question of a fresh practice run. Otherwise questions accumulate into the
+# same session log so finish-test.sh can grade all of them together.
+if [[ "${NEW_TEST_SESSION:-0}" == "1" ]]; then
+  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  rm -f "$REPO_ROOT/scripts/.session_log"
+  rm -f "$REPO_ROOT/scripts/.session_start"
+fi
+
 reset_cluster
 
 echo "==> Running lab setup for $QUESTION_DIR"
@@ -119,4 +129,23 @@ cat "$QUESTION_TEXT"
 echo
 if [[ -f "$SOLUTION" ]]; then
   echo "Hints: see $SOLUTION"
+fi
+
+# Log this question as attempted in the current test session, so finish-test.sh
+# can grade it later. Avoid duplicate entries for the same question.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LOG_FILE="$REPO_ROOT/scripts/.session_log"
+touch "$LOG_FILE"
+if ! grep -qxF "$QUESTION_DIR" "$LOG_FILE"; then
+  echo "$QUESTION_DIR" >> "$LOG_FILE"
+fi
+
+# Start the exam timer on the very first question of a session (real CKA
+# exam duration is 2 hours). The timestamp is stored so finish-test.sh can
+# compute the elapsed time when the session is graded.
+TIMER_FILE="$REPO_ROOT/scripts/.session_start"
+if [[ ! -f "$TIMER_FILE" ]]; then
+  date +%s > "$TIMER_FILE"
+  echo
+  echo "==> Timer started! You have 2h (CKA exam duration) to finish the session."
 fi
