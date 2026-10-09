@@ -69,7 +69,8 @@ while true; do
   ELAPSED_FMT="$(printf '%02d:%02d:%02d' $((ELAPSED / 3600)) $(((ELAPSED % 3600) / 60)) $((ELAPSED % 60)))"
 
   # Build a fixed-width progress bar showing how much of the 2h exam time is
-  # still remaining, with the remaining time printed inside the bar itself.
+  # still remaining (the exact remaining time is shown below on the
+  # "Remaining:" line, so the bar itself stays clean).
   # It starts full (100%) and empties out as time runs out.
   BAR_WIDTH=40
   PERCENT_REMAINING=$((REMAINING * 100 / EXAM_DURATION_SECONDS))
@@ -82,7 +83,6 @@ while true; do
     REMAINING_ABS=$((-REMAINING))
     REMAINING_FMT="$(printf '%02d:%02d:%02d' $((REMAINING_ABS / 3600)) $(((REMAINING_ABS % 3600) / 60)) $((REMAINING_ABS % 60)))"
     BAR_COLOR="$RED"
-    BAR_LABEL="+$REMAINING_FMT over"
   else
     REMAINING_FMT="$(printf '%02d:%02d:%02d' $((REMAINING / 3600)) $(((REMAINING % 3600) / 60)) $((REMAINING % 60)))"
     if [[ "$REMAINING" -le 600 ]]; then
@@ -92,32 +92,11 @@ while true; do
     else
       BAR_COLOR="$GREEN"
     fi
-    BAR_LABEL="$REMAINING_FMT left"
   fi
-
-  # Center the "time left" label inside the bar's total width.
-  LABEL_LEN=${#BAR_LABEL}
-  PAD_TOTAL=$((BAR_WIDTH - LABEL_LEN))
-  [[ "$PAD_TOTAL" -lt 0 ]] && PAD_TOTAL=0
-  PAD_LEFT=$((PAD_TOTAL / 2))
-  PAD_RIGHT=$((PAD_TOTAL - PAD_LEFT))
 
   BAR_FULL="$(printf '%0.s#' $(seq 1 "$FILLED" 2>/dev/null))"
   BAR_VOID="$(printf '%0.s-' $(seq 1 "$EMPTY" 2>/dev/null))"
-  BAR_RAW="${BAR_FULL}${BAR_VOID}"
-  # Overlay the centered label on top of the raw bar characters so the bar
-  # itself still shows the fill/empty proportion around the text. Only the
-  # padding area (outside the label's own range) falls back to the raw bar
-  # character; any space that is part of the label itself (e.g. between the
-  # time and "left"/"over") is kept as a literal space.
-  BAR_DISPLAY=""
-  for ((i = 0; i < BAR_WIDTH; i++)); do
-    if [[ "$i" -ge "$PAD_LEFT" && "$i" -lt "$((PAD_LEFT + LABEL_LEN))" ]]; then
-      BAR_DISPLAY+="${BAR_LABEL:$((i - PAD_LEFT)):1}"
-    else
-      BAR_DISPLAY+="${BAR_RAW:$i:1}"
-    fi
-  done
+  BAR_DISPLAY="${BAR_FULL}${BAR_VOID}"
 
   echo
   echo -e "${BLUE}Elapsed:${RESET}   ${BOLD}$ELAPSED_FMT${RESET}  /  02:00:00 (CKA exam duration)"
