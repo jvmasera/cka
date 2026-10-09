@@ -43,6 +43,32 @@ SOLUTION="$QUESTION_DIR/SolutionNotes.bash"
 
 chmod +x "$SETUP"
 
+# When starting a brand new test session (timer not running yet) outside of
+# tmux, automatically open a tmux session with 2 panes split horizontally:
+# the top one running the fixed on-screen timer (show-timer.sh) and the
+# bottom one running this very question (so the whole exam experience -
+# timer + question - is ready in a single tmux session). If we're already
+# inside tmux, or tmux isn't available, just proceed normally below.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TIMER_FILE="$REPO_ROOT/scripts/.session_start"
+if [[ -z "${TMUX:-}" && ! -f "$TIMER_FILE" ]] && command -v tmux >/dev/null 2>&1; then
+  SESSION_NAME="cka-exam"
+  SCRIPT_PATH="$REPO_ROOT/scripts/run-question.sh"
+  SHOW_TIMER="$REPO_ROOT/scripts/show-timer.sh"
+  chmod +x "$SCRIPT_PATH" "$SHOW_TIMER" 2>/dev/null || true
+
+  ARGS_Q=""
+  for a in "$@"; do
+    ARGS_Q+=" $(printf '%q' "$a")"
+  done
+
+  tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
+  tmux new-session -d -s "$SESSION_NAME" -c "$REPO_ROOT" "$SHOW_TIMER"
+  tmux split-window -v -t "$SESSION_NAME" -c "$REPO_ROOT" "$SCRIPT_PATH$ARGS_Q; exec bash"
+  tmux select-pane -t "$SESSION_NAME:0.1"
+  exec tmux attach-session -t "$SESSION_NAME"
+fi
+
 reset_cluster() {
   echo "==> Resetting cluster to clean state..."
   if ! command -v kubectl >/dev/null 2>&1; then
@@ -150,14 +176,18 @@ if [[ ! -f "$TIMER_FILE" ]]; then
   echo "==> Timer started! You have 2h (CKA exam duration) to finish the session."
 
   # Try to automatically open the fixed on-screen timer in a new tmux pane,
-  # so you don't need to run show-timer.sh manually. Only works when already
-  # inside a tmux session; otherwise just hint the manual command.
+  # so you don't need to run show-timer.sh manually. If we already run inside
+  # a tmux window with 2+ panes, assume the timer pane was already set up
+  # (e.g. by the auto-launched session above) and skip creating another one.
   SHOW_TIMER="$REPO_ROOT/scripts/show-timer.sh"
   chmod +x "$SHOW_TIMER" 2>/dev/null || true
   if [[ -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
-    tmux split-window -h "$SHOW_TIMER" 2>/dev/null \
-      && echo "==> Timer window opened automatically (tmux split-window)." \
-      || echo "==> Could not auto-open the timer window. Run manually: $SHOW_TIMER"
+    PANE_COUNT="$(tmux list-panes 2>/dev/null | wc -l)"
+    if [[ "${PANE_COUNT:-1}" -le 1 ]]; then
+      tmux split-window -v "$SHOW_TIMER" 2>/dev/null \
+        && echo "==> Timer pane opened automatically (tmux split-window)." \
+        || echo "==> Could not auto-open the timer pane. Run manually: $SHOW_TIMER"
+    fi
   else
     echo "==> To keep the timer fixed on screen, run in another terminal/pane: $SHOW_TIMER"
   fi
