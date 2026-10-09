@@ -6,6 +6,14 @@
 # - Shows which questions were correct/incorrect and why
 set -uo pipefail
 
+# Colors (disabled automatically when not attached to a terminal).
+if [[ -t 1 ]]; then
+  BOLD='\033[1m'; RESET='\033[0m'
+  CYAN='\033[36m'; YELLOW='\033[33m'; GREEN='\033[32m'; RED='\033[31m'; BLUE='\033[34m'; MAGENTA='\033[35m'
+else
+  BOLD=''; RESET=''; CYAN=''; YELLOW=''; GREEN=''; RED=''; BLUE=''; MAGENTA=''
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_FILE="$REPO_ROOT/scripts/.session_log"
 TIMER_FILE="$REPO_ROOT/scripts/.session_start"
@@ -149,63 +157,77 @@ for QUESTION_DIR in "${ALL_QUESTIONS[@]}"; do
 done
 
 PERCENT=$(( CORRECT * 100 / TOTAL ))
-
-echo "=================================================="
-echo "                CKA PRACTICE RESULTS"
-echo "=================================================="
-echo "Time elapsed:         $ELAPSED_FMT ($TIME_STATUS)"
-echo "Time limit:           02:00:00 (CKA exam duration)"
-echo "Total exam questions: $TOTAL"
-echo "Questions attempted:  $ATTEMPTED_COUNT"
-echo "Correct answers:      $CORRECT"
-echo "Score:                 $PERCENT%  ($CORRECT/$TOTAL)"
-echo "Passing score:        $PASSING_SCORE% (official CKA minimum to pass)"
-echo "--------------------------------------------------"
-if [[ "$PERCENT" -ge "$PASSING_SCORE" ]]; then
-  echo "Result: PASSED ✅ (you need at least $PASSING_SCORE% to pass the real CKA)"
+if [[ "$PERCENT" -ge "$TARGET_SCORE_HIGH" ]]; then
+  SCORE_COLOR="$GREEN"
+elif [[ "$PERCENT" -ge "$PASSING_SCORE" ]]; then
+  SCORE_COLOR="$YELLOW"
 else
-  echo "Result: FAILED ❌ (you need at least $PASSING_SCORE% to pass the real CKA)"
+  SCORE_COLOR="$RED"
+fi
+
+echo -e "${CYAN}==================================================${RESET}"
+echo -e "${BOLD}${CYAN}                CKA PRACTICE RESULTS${RESET}"
+echo -e "${CYAN}==================================================${RESET}"
+echo -e "${BLUE}Time elapsed:${RESET}         $ELAPSED_FMT ($TIME_STATUS)"
+echo -e "${BLUE}Time limit:${RESET}           02:00:00 (CKA exam duration)"
+echo -e "${BLUE}Total exam questions:${RESET} $TOTAL"
+echo -e "${BLUE}Questions attempted:${RESET}  $ATTEMPTED_COUNT"
+echo -e "${BLUE}Correct answers:${RESET}      ${GREEN}$CORRECT${RESET}"
+echo -e "${BLUE}Score:${RESET}                 ${BOLD}${SCORE_COLOR}$PERCENT%${RESET}  ($CORRECT/$TOTAL)"
+echo -e "${BLUE}Passing score:${RESET}        $PASSING_SCORE% (official CKA minimum to pass)"
+echo -e "${CYAN}--------------------------------------------------${RESET}"
+if [[ "$PERCENT" -ge "$PASSING_SCORE" ]]; then
+  echo -e "${BOLD}${GREEN}Result: PASSED ✅ (you need at least $PASSING_SCORE% to pass the real CKA)${RESET}"
+else
+  echo -e "${BOLD}${RED}Result: FAILED ❌ (you need at least $PASSING_SCORE% to pass the real CKA)${RESET}"
 fi
 if [[ "$PERCENT" -ge "$TARGET_SCORE_HIGH" ]]; then
-  echo "Practice target: 🎯 Great! You're at/above the ${TARGET_SCORE_LOW}-${TARGET_SCORE_HIGH}%+ practice target (safety margin for exam day)."
+  echo -e "${GREEN}Practice target: 🎯 Great! You're at/above the ${TARGET_SCORE_LOW}-${TARGET_SCORE_HIGH}%+ practice target (safety margin for exam day).${RESET}"
 else
-  echo "Practice target: 🎯 Aim for ${TARGET_SCORE_LOW}-${TARGET_SCORE_HIGH}%+ in practice runs for a safety margin on exam day."
+  echo -e "${YELLOW}Practice target: 🎯 Aim for ${TARGET_SCORE_LOW}-${TARGET_SCORE_HIGH}%+ in practice runs for a safety margin on exam day.${RESET}"
 fi
-echo "=================================================="
+echo -e "${CYAN}==================================================${RESET}"
 echo
 
-echo "CKA domain weight breakdown (official exam weights):"
+echo -e "${BOLD}${MAGENTA}CKA domain weight breakdown (official exam weights):${RESET}"
 for DOMAIN in "${DOMAIN_ORDER[@]}"; do
   D_TOTAL="${DOMAIN_TOTAL[$DOMAIN]:-0}"
   D_CORRECT="${DOMAIN_CORRECT[$DOMAIN]:-0}"
   WEIGHT="${DOMAIN_WEIGHT[$DOMAIN]}"
   if [[ "$D_TOTAL" -gt 0 ]]; then
     D_PERCENT=$(( D_CORRECT * 100 / D_TOTAL ))
-    printf "  - %-52s weight: %2d%%  |  attempted: %d/%d  |  score: %d%%\n" "$DOMAIN" "$WEIGHT" "$D_CORRECT" "$D_TOTAL" "$D_PERCENT"
+    if [[ "$D_PERCENT" -ge "$TARGET_SCORE_HIGH" ]]; then
+      D_COLOR="$GREEN"
+    elif [[ "$D_PERCENT" -ge "$PASSING_SCORE" ]]; then
+      D_COLOR="$YELLOW"
+    else
+      D_COLOR="$RED"
+    fi
+    printf "  - ${CYAN}%-52s${RESET} weight: %2d%%  |  attempted: %d/%d  |  score: ${D_COLOR}%d%%${RESET}\n" "$DOMAIN" "$WEIGHT" "$D_CORRECT" "$D_TOTAL" "$D_PERCENT"
   else
-    printf "  - %-52s weight: %2d%%  |  attempted: 0 (not covered this session)\n" "$DOMAIN" "$WEIGHT"
+    printf "  - ${CYAN}%-52s${RESET} weight: %2d%%  |  ${YELLOW}attempted: 0 (not covered this session)${RESET}\n" "$DOMAIN" "$WEIGHT"
   fi
 done
 echo
 
 if [[ ${#CORRECT_LIST[@]} -gt 0 ]]; then
-  echo "✔ Correct questions:"
+  echo -e "${BOLD}${GREEN}✔ Correct questions:${RESET}"
   for q in "${CORRECT_LIST[@]}"; do
-    echo "  - $q"
+    echo -e "  ${GREEN}- $q${RESET}"
   done
   echo
 fi
 
 if [[ ${#WRONG_LIST[@]} -gt 0 ]]; then
-  echo "✘ Incorrect questions (and why):"
+  echo -e "${BOLD}${RED}✘ Incorrect questions (and why):${RESET}"
   for i in "${!WRONG_LIST[@]}"; do
-    echo "  - ${WRONG_LIST[$i]} [${WRONG_DOMAINS[$i]:-Unknown}]"
-    echo "${WRONG_REASONS[$i]}"
+    echo -e "  ${RED}- ${WRONG_LIST[$i]}${RESET} ${MAGENTA}[${WRONG_DOMAINS[$i]:-Unknown}]${RESET}"
+    echo -e "${YELLOW}${WRONG_REASONS[$i]}${RESET}"
   done
   echo
 fi
 
-echo "Tip: run 'scripts/run-question.sh <number>' again to retry a question, then"
+echo -e "${CYAN}Tip:${RESET} run 'scripts/run-question.sh <number>' again to retry a question, then"
 echo "'scripts/finish-test.sh' once more to re-grade the session."
 echo
 

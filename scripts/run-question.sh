@@ -1,8 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
+# Colors (disabled automatically when not attached to a terminal).
+if [[ -t 1 ]]; then
+  BOLD='\033[1m'; RESET='\033[0m'
+  CYAN='\033[36m'; YELLOW='\033[33m'; GREEN='\033[32m'; RED='\033[31m'; BLUE='\033[34m'
+else
+  BOLD=''; RESET=''; CYAN=''; YELLOW=''; GREEN=''; RED=''; BLUE=''
+fi
+
 if [[ $# -lt 1 ]]; then
-  echo "Usage: scripts/run-question.sh <number|Question-XX Topic>" >&2
+  echo -e "${RED}Usage: scripts/run-question.sh <number|Question-XX Topic>${RESET}" >&2
   exit 1
 fi
 
@@ -30,7 +38,7 @@ if [[ -z "$QUESTION_DIR" ]]; then
 fi
 
 if [[ ! -d "$QUESTION_DIR" ]]; then
-  echo "Question directory '$QUESTION_DIR' not found" >&2
+  echo -e "${RED}Question directory '$QUESTION_DIR' not found${RESET}" >&2
   exit 1
 fi
 
@@ -77,15 +85,15 @@ if [[ -z "${TMUX:-}" && ! -f "$TIMER_FILE" ]] && command -v tmux >/dev/null 2>&1
 fi
 
 reset_cluster() {
-  echo "==> Resetting cluster to clean state..."
+  echo -e "${CYAN}==> Resetting cluster to clean state...${RESET}"
   if ! command -v kubectl >/dev/null 2>&1; then
-    echo "kubectl not found, skipping cluster reset."
+    echo -e "${YELLOW}kubectl not found, skipping cluster reset.${RESET}"
     return 0
   fi
 
   # Check if cluster is reachable
   if ! kubectl cluster-info >/dev/null 2>&1; then
-    echo "Cluster is not reachable, skipping cluster reset."
+    echo -e "${YELLOW}Cluster is not reachable, skipping cluster reset.${RESET}"
     return 0
   fi
 
@@ -93,13 +101,13 @@ reset_cluster() {
   LAB_NAMESPACES=("mariadb" "echo-sound" "frontend" "backend" "relative" "nginx-static" "argocd" "autoscale" "cert-manager" "priority" "tigera-operator")
   for ns in "${LAB_NAMESPACES[@]}"; do
     if kubectl get ns "$ns" >/dev/null 2>&1; then
-      echo "Deleting namespace: $ns"
+      echo -e "${YELLOW}Deleting namespace: $ns${RESET}"
       kubectl delete ns "$ns" --timeout=60s --ignore-not-found || true
     fi
   done
 
   # 2. Resources commonly created in the default namespace
-  echo "Cleaning up resources in default namespace..."
+  echo -e "${CYAN}Cleaning up resources in default namespace...${RESET}"
   kubectl delete deploy wordpress web-deployment nginx nginx-static mariadb --namespace default --ignore-not-found 2>/dev/null || true
   kubectl delete svc web-service nginx nginx-service mariadb --namespace default --ignore-not-found 2>/dev/null || true
   kubectl delete ingress web nginx-ingress --namespace default --ignore-not-found 2>/dev/null || true
@@ -108,7 +116,7 @@ reset_cluster() {
   kubectl delete pvc mariadb --namespace default --ignore-not-found 2>/dev/null || true
 
   # 3. Cluster-scoped resources created across questions
-  echo "Cleaning up cluster-scoped resources..."
+  echo -e "${CYAN}Cleaning up cluster-scoped resources...${RESET}"
   kubectl delete pv mariadb-pv --ignore-not-found 2>/dev/null || true
   kubectl delete priorityclass user-critical high-priority --ignore-not-found 2>/dev/null || true
   if kubectl api-resources | grep -qi gatewayclass; then
@@ -131,13 +139,13 @@ reset_cluster() {
   
   REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   if [[ -d "$REPO_ROOT/sandbox" ]]; then
-    echo "Cleaning up sandbox folder..."
+    echo -e "${CYAN}Cleaning up sandbox folder...${RESET}"
     find "$REPO_ROOT/sandbox" -mindepth 1 ! -name '.gitkeep' -delete 2>/dev/null || true
   else
     mkdir -p "$REPO_ROOT/sandbox"
   fi
 
-  echo "==> Cluster reset complete."
+  echo -e "${GREEN}==> Cluster reset complete.${RESET}"
 }
 
 # Reset the test session log whenever an explicit "new session" is requested,
@@ -152,16 +160,16 @@ fi
 
 reset_cluster
 
-echo "==> Running lab setup for $QUESTION_DIR"
+echo -e "${CYAN}==> Running lab setup for ${BOLD}$QUESTION_DIR${RESET}"
 "$SETUP"
 
 echo
-echo "==> Question"
+echo -e "${BOLD}${BLUE}==> Question${RESET}"
 cat "$QUESTION_TEXT"
 
 echo
 if [[ -f "$SOLUTION" ]]; then
-  echo "Hints: see $SOLUTION"
+  echo -e "${YELLOW}Hints: see $SOLUTION${RESET}"
 fi
 
 # Log this question as attempted in the current test session, so finish-test.sh
@@ -180,7 +188,7 @@ TIMER_FILE="$REPO_ROOT/scripts/.session_start"
 if [[ ! -f "$TIMER_FILE" ]]; then
   date +%s > "$TIMER_FILE"
   echo
-  echo "==> Timer started! You have 2h (CKA exam duration) to finish the session."
+  echo -e "${BOLD}${GREEN}==> Timer started! You have 2h (CKA exam duration) to finish the session.${RESET}"
 
   # Try to automatically open the fixed on-screen timer in a new tmux pane,
   # so you don't need to run show-timer.sh manually. If we already run inside
@@ -193,12 +201,12 @@ if [[ ! -f "$TIMER_FILE" ]]; then
     if [[ "${PANE_COUNT:-1}" -le 1 ]]; then
       tmux split-window -v -b "$SHOW_TIMER" 2>/dev/null \
         && tmux resize-pane -U -y 6 2>/dev/null \
-        && echo "==> Timer pane opened automatically (tmux split-window)." \
-        || echo "==> Could not auto-open the timer pane. Run manually: $SHOW_TIMER"
+        && echo -e "${GREEN}==> Timer pane opened automatically (tmux split-window).${RESET}" \
+        || echo -e "${YELLOW}==> Could not auto-open the timer pane. Run manually: $SHOW_TIMER${RESET}"
       tmux set-option -g mouse on 2>/dev/null || true
       tmux set-option -g history-limit 50000 2>/dev/null || true
     fi
   else
-    echo "==> To keep the timer fixed on screen, run in another terminal/pane: $SHOW_TIMER"
+    echo -e "${YELLOW}==> To keep the timer fixed on screen, run in another terminal/pane: $SHOW_TIMER${RESET}"
   fi
 fi
