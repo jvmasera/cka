@@ -1,4 +1,19 @@
-# Patch wordpress deployment to add shared volume + native sidecar (initContainer with restartPolicy: Always)
+# Add shared volume + sidecar to deployment
+kubectl edit deployment wordpress   # add emptyDir volume and mounts below
+# spec.template.spec.volumes:
+# - name: log
+#   emptyDir: {}
+# main container volumeMounts:
+# - mountPath: /var/log
+#   name: log
+# add sidecar:
+# - name: sidecar
+#   image: busybox:stable
+#   command: ["/bin/sh","-c","tail -f /var/log/wordpress.log"]
+#   volumeMounts:
+#   - mountPath: /var/log
+#     name: log
+# Patch wordpress deployment to add shared volume + sidecar
 cat <<'EOF' | kubectl apply -f -
 apiVersion: apps/v1
 kind: Deployment
@@ -10,16 +25,14 @@ spec:
       volumes:
       - name: log
         emptyDir: {}
-      initContainers:
-      - name: sidecar
-        image: busybox:stable
-        restartPolicy: Always
-        command: ["/bin/sh","-c","touch /var/log/wordpress.log; tail -f /var/log/wordpress.log"]
+      containers:
+      - name: wordpress
         volumeMounts:
         - name: log
           mountPath: /var/log
-      containers:
-      - name: wordpress
+      - name: sidecar
+        image: busybox:stable
+        command: ["/bin/sh","-c","tail -f /var/log/wordpress.log"]
         volumeMounts:
         - name: log
           mountPath: /var/log
