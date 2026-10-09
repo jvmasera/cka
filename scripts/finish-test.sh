@@ -10,7 +10,45 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_FILE="$REPO_ROOT/scripts/.session_log"
 TIMER_FILE="$REPO_ROOT/scripts/.session_start"
 PASSING_SCORE=66
+TARGET_SCORE_LOW=75
+TARGET_SCORE_HIGH=80
 EXAM_DURATION_SECONDS=$((2 * 60 * 60))
+
+# CKA exam domains and their official weight on the real exam. Used to break
+# down the practice score by domain, so you can see which areas need more
+# study (mirrors the current CKA curriculum weights).
+declare -A DOMAIN_WEIGHT=(
+  ["Troubleshooting"]=30
+  ["Cluster Architecture, Installation & Configuration"]=25
+  ["Services & Networking"]=20
+  ["Workloads & Scheduling"]=15
+  ["Storage"]=10
+)
+# Domain ordering for a stable, weight-descending report.
+DOMAIN_ORDER=("Troubleshooting" "Cluster Architecture, Installation & Configuration" "Services & Networking" "Workloads & Scheduling" "Storage")
+
+# Maps each question folder to the CKA domain it exercises.
+declare -A QUESTION_DOMAIN=(
+  ["Question-1 MariaDB-Persistent volume"]="Storage"
+  ["Question-2 ArgoCD"]="Cluster Architecture, Installation & Configuration"
+  ["Question-3 Sidecar"]="Workloads & Scheduling"
+  ["Question-4 Resource-Allocation"]="Workloads & Scheduling"
+  ["Question-5 HPA"]="Workloads & Scheduling"
+  ["Question-6 CRDs"]="Cluster Architecture, Installation & Configuration"
+  ["Question-7 PriorityClass"]="Workloads & Scheduling"
+  ["Question-8 CNI & Network Policy"]="Services & Networking"
+  ["Question-9 Cri-Dockerd"]="Cluster Architecture, Installation & Configuration"
+  ["Question-10 Taints-Tolerations"]="Workloads & Scheduling"
+  ["Question-11 Gateway-API"]="Services & Networking"
+  ["Question-12 Ingress"]="Services & Networking"
+  ["Question-13 Network-Policy"]="Services & Networking"
+  ["Question-14 Storage-Class"]="Storage"
+  ["Question-15 Etcd-Fix"]="Troubleshooting"
+  ["Question-16 NodePort"]="Services & Networking"
+  ["Question-17 TLS-Config"]="Troubleshooting"
+)
+declare -A DOMAIN_TOTAL=()
+declare -A DOMAIN_CORRECT=()
 
 if [[ ! -f "$LOG_FILE" || ! -s "$LOG_FILE" ]]; then
   echo "No questions were attempted in this session (nothing logged in $LOG_FILE)." >&2
@@ -46,6 +84,7 @@ CORRECT=0
 declare -a CORRECT_LIST=()
 declare -a WRONG_LIST=()
 declare -a WRONG_REASONS=()
+declare -a WRONG_DOMAINS=()
 
 while IFS= read -r QUESTION_DIR; do
   [[ -z "$QUESTION_DIR" ]] && continue
@@ -53,10 +92,13 @@ while IFS= read -r QUESTION_DIR; do
 
   TOTAL=$((TOTAL + 1))
   VERIFY="$REPO_ROOT/$QUESTION_DIR/Verify.bash"
+  DOMAIN="${QUESTION_DOMAIN[$QUESTION_DIR]:-Unknown}"
+  DOMAIN_TOTAL["$DOMAIN"]=$(( ${DOMAIN_TOTAL["$DOMAIN"]:-0} + 1 ))
 
   if [[ ! -f "$VERIFY" ]]; then
     WRONG_LIST+=("$QUESTION_DIR")
     WRONG_REASONS+=("No Verify.bash found for this question, could not be auto-graded.")
+    WRONG_DOMAINS+=("$DOMAIN")
     continue
   fi
 
@@ -68,8 +110,10 @@ while IFS= read -r QUESTION_DIR; do
   if [[ "$RESULT_LINE" == "RESULT:PASS" ]]; then
     CORRECT=$((CORRECT + 1))
     CORRECT_LIST+=("$QUESTION_DIR")
+    DOMAIN_CORRECT["$DOMAIN"]=$(( ${DOMAIN_CORRECT["$DOMAIN"]:-0} + 1 ))
   else
     WRONG_LIST+=("$QUESTION_DIR")
+    WRONG_DOMAINS+=("$DOMAIN")
     if [[ -n "$REASONS" ]]; then
       WRONG_REASONS+=("$REASONS")
     else
@@ -93,14 +137,33 @@ echo "Time limit:           02:00:00 (CKA exam duration)"
 echo "Questions attempted: $TOTAL"
 echo "Correct answers:     $CORRECT"
 echo "Score:                $PERCENT%"
-echo "Passing score:        $PASSING_SCORE%"
+echo "Passing score:        $PASSING_SCORE% (official CKA minimum to pass)"
 echo "--------------------------------------------------"
 if [[ "$PERCENT" -ge "$PASSING_SCORE" ]]; then
   echo "Result: PASSED ✅ (you need at least $PASSING_SCORE% to pass the real CKA)"
 else
   echo "Result: FAILED ❌ (you need at least $PASSING_SCORE% to pass the real CKA)"
 fi
+if [[ "$PERCENT" -ge "$TARGET_SCORE_HIGH" ]]; then
+  echo "Practice target: 🎯 Great! You're at/above the ${TARGET_SCORE_LOW}-${TARGET_SCORE_HIGH}%+ practice target (safety margin for exam day)."
+else
+  echo "Practice target: 🎯 Aim for ${TARGET_SCORE_LOW}-${TARGET_SCORE_HIGH}%+ in practice runs for a safety margin on exam day."
+fi
 echo "=================================================="
+echo
+
+echo "CKA domain weight breakdown (official exam weights):"
+for DOMAIN in "${DOMAIN_ORDER[@]}"; do
+  D_TOTAL="${DOMAIN_TOTAL[$DOMAIN]:-0}"
+  D_CORRECT="${DOMAIN_CORRECT[$DOMAIN]:-0}"
+  WEIGHT="${DOMAIN_WEIGHT[$DOMAIN]}"
+  if [[ "$D_TOTAL" -gt 0 ]]; then
+    D_PERCENT=$(( D_CORRECT * 100 / D_TOTAL ))
+    printf "  - %-52s weight: %2d%%  |  attempted: %d/%d  |  score: %d%%\n" "$DOMAIN" "$WEIGHT" "$D_CORRECT" "$D_TOTAL" "$D_PERCENT"
+  else
+    printf "  - %-52s weight: %2d%%  |  attempted: 0 (not covered this session)\n" "$DOMAIN" "$WEIGHT"
+  fi
+done
 echo
 
 if [[ ${#CORRECT_LIST[@]} -gt 0 ]]; then
@@ -114,7 +177,7 @@ fi
 if [[ ${#WRONG_LIST[@]} -gt 0 ]]; then
   echo "✘ Incorrect questions (and why):"
   for i in "${!WRONG_LIST[@]}"; do
-    echo "  - ${WRONG_LIST[$i]}"
+    echo "  - ${WRONG_LIST[$i]} [${WRONG_DOMAINS[$i]:-Unknown}]"
     echo "${WRONG_REASONS[$i]}"
   done
   echo

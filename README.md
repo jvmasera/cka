@@ -15,7 +15,7 @@ Straightforward CKA practice labs derived from the CKA-PREP playlist. Every ques
    - To keep the timer fixed on screen while you work, open a second terminal/pane (e.g. `tmux split-window -h ./scripts/show-timer.sh`, or a separate terminal tab/window) and run `./scripts/show-timer.sh`. It keeps refreshing every second with the elapsed/remaining time until `scripts/finish-test.sh` ends the session.
 5. Work through the task, then consult `SolutionNotes.bash` if you need help.
 6. Repeat step 4 for as many questions as you want to attempt in the same practice run.
-7. When you're done, run `./scripts/finish-test.sh` to end the test. It stops the timer and shows the elapsed time against the 2-hour CKA limit, grades every question you attempted (via each question's `Verify.bash`), shows your score as a percentage (same style as the real CKA), compares it against the passing score (66%), tells you if you passed, and lists which questions you got right/wrong and why.
+7. When you're done, run `./scripts/finish-test.sh` to end the test. It stops the timer and shows the elapsed time against the 2-hour CKA limit, grades every question you attempted (via each question's `Verify.bash`), shows your score as a percentage (same style as the real CKA), compares it against the passing score (66%), suggests a 75-80%+ practice target for a safety margin on exam day, breaks down your score by the official CKA domain weights (Troubleshooting 30%, Cluster Architecture/Installation/Configuration 25%, Services & Networking 20%, Workloads & Scheduling 15%, Storage 10%), and lists which questions you got right/wrong and why.
 
 ## Available Questions
 | Question | Topic | Video |
