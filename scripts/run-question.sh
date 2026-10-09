@@ -75,7 +75,7 @@ if [[ -z "${TMUX:-}" && ! -f "$TIMER_FILE" ]] && command -v tmux >/dev/null 2>&1
   tmux split-window -v -t "$SESSION_NAME" -c "$REPO_ROOT" "$SCRIPT_PATH$ARGS_Q; exec bash"
   # Keep the timer pane small (it only needs a few lines) and give the
   # question pane the rest of the screen.
-  tmux resize-pane -t "$SESSION_NAME:0.0" -y 6
+  tmux resize-pane -t "$SESSION_NAME:0.0" -y 3
   # Enable mouse mode and a bigger scrollback buffer so scrolling works
   # inside each pane (e.g. while editing files with vim).
   tmux set-option -t "$SESSION_NAME" -g mouse on
@@ -200,7 +200,7 @@ if [[ ! -f "$TIMER_FILE" ]]; then
     PANE_COUNT="$(tmux list-panes 2>/dev/null | wc -l)"
     if [[ "${PANE_COUNT:-1}" -le 1 ]]; then
       tmux split-window -v -b "$SHOW_TIMER" 2>/dev/null \
-        && tmux resize-pane -U -y 6 2>/dev/null \
+        && tmux resize-pane -U -y 3 2>/dev/null \
         && echo -e "${GREEN}==> Timer pane opened automatically (tmux split-window).${RESET}" \
         || echo -e "${YELLOW}==> Could not auto-open the timer pane. Run manually: $SHOW_TIMER${RESET}"
       tmux set-option -g mouse on 2>/dev/null || true
