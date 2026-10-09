@@ -148,14 +148,41 @@ reset_cluster() {
   echo -e "${GREEN}==> Cluster reset complete.${RESET}"
 }
 
+LOG_FILE="$REPO_ROOT/scripts/.session_log"
+RESULTS_FILE="$REPO_ROOT/scripts/.session_results"
+
 # Reset the test session log whenever an explicit "new session" is requested,
 # i.e. when the user sets NEW_TEST_SESSION=1 before starting the first
 # question of a fresh practice run. Otherwise questions accumulate into the
 # same session log so finish-test.sh can grade all of them together.
 if [[ "${NEW_TEST_SESSION:-0}" == "1" ]]; then
-  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-  rm -f "$REPO_ROOT/scripts/.session_log"
+  rm -f "$LOG_FILE"
+  rm -f "$RESULTS_FILE"
   rm -f "$REPO_ROOT/scripts/.session_start"
+fi
+
+# Before wiping the cluster below, cache the verification result of the
+# question you were just working on (the last one logged). This way,
+# finish-test.sh can later grade it using this cached result instead of
+# re-checking the live cluster, which would no longer have those objects
+# once a new question resets everything. Cache once per question (skip if
+# already cached, e.g. if you re-run the same question again).
+touch "$LOG_FILE"
+if [[ -s "$LOG_FILE" ]]; then
+  PREV_QUESTION="$(tail -n1 "$LOG_FILE")"
+  if [[ -n "$PREV_QUESTION" && "$PREV_QUESTION" != "$QUESTION_DIR" && -d "$PREV_QUESTION" ]]; then
+    PREV_VERIFY="$REPO_ROOT/$PREV_QUESTION/Verify.bash"
+    if [[ -f "$PREV_VERIFY" ]] && ! grep -qxF "@@QUESTION@@$PREV_QUESTION" "$RESULTS_FILE" 2>/dev/null; then
+      echo -e "${CYAN}==> Caching verification result for previous question ($PREV_QUESTION) before reset...${RESET}"
+      chmod +x "$PREV_VERIFY" 2>/dev/null || true
+      PREV_OUTPUT="$(bash "$PREV_VERIFY" 2>&1)"
+      {
+        echo "@@QUESTION@@$PREV_QUESTION"
+        echo "$PREV_OUTPUT"
+        echo "@@ENDQUESTION@@"
+      } >> "$RESULTS_FILE"
+    fi
+  fi
 fi
 
 reset_cluster
@@ -173,12 +200,19 @@ if [[ -f "$SOLUTION" ]]; then
 fi
 
 # Log this question as attempted in the current test session, so finish-test.sh
-# can grade it later. Avoid duplicate entries for the same question.
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LOG_FILE="$REPO_ROOT/scripts/.session_log"
+# can grade it later. Avoid duplicate entries for the same question. Also
+# drop any stale cached verification result for this question (e.g. if you
+# are retrying it), so it gets freshly re-verified (live or cached) next time.
 touch "$LOG_FILE"
 if ! grep -qxF "$QUESTION_DIR" "$LOG_FILE"; then
   echo "$QUESTION_DIR" >> "$LOG_FILE"
+fi
+if [[ -f "$RESULTS_FILE" ]] && grep -qxF "@@QUESTION@@$QUESTION_DIR" "$RESULTS_FILE"; then
+  awk -v q="@@QUESTION@@$QUESTION_DIR" '
+    $0 == q { skip=1 }
+    skip && $0 == "@@ENDQUESTION@@" { skip=0; next }
+    !skip { print }
+  ' "$RESULTS_FILE" > "$RESULTS_FILE.tmp" && mv "$RESULTS_FILE.tmp" "$RESULTS_FILE"
 fi
 
 # Start the exam timer on the very first question of a session (real CKA

@@ -17,6 +17,21 @@ fi
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_FILE="$REPO_ROOT/scripts/.session_log"
 TIMER_FILE="$REPO_ROOT/scripts/.session_start"
+RESULTS_FILE="$REPO_ROOT/scripts/.session_results"
+
+# Reads a cached Verify.bash output (captured by run-question.sh right before
+# it reset the cluster for the next question) for the given question
+# directory, if one exists. Prints nothing (empty string) when there's no
+# cached entry for it.
+get_cached_output() {
+  local question_dir="$1"
+  [[ -f "$RESULTS_FILE" ]] || return 0
+  awk -v q="@@QUESTION@@$question_dir" '
+    $0 == q { found=1; next }
+    found && $0 == "@@ENDQUESTION@@" { exit }
+    found { print }
+  ' "$RESULTS_FILE"
+}
 PASSING_SCORE=66
 TARGET_SCORE_LOW=75
 TARGET_SCORE_HIGH=80
@@ -136,8 +151,18 @@ for QUESTION_DIR in "${ALL_QUESTIONS[@]}"; do
     continue
   fi
 
-  chmod +x "$VERIFY" 2>/dev/null || true
-  OUTPUT="$(bash "$VERIFY" 2>&1)"
+  # Prefer a cached result (captured by run-question.sh right before it reset
+  # the cluster for the next question) when available: the cluster may no
+  # longer have the objects for this question once a later one reset it. Only
+  # fall back to a live check when there's no cache, e.g. the question you're
+  # still actively working on (its state is still live in the cluster).
+  CACHED_OUTPUT="$(get_cached_output "$QUESTION_DIR")"
+  if [[ -n "$CACHED_OUTPUT" ]]; then
+    OUTPUT="$CACHED_OUTPUT"
+  else
+    chmod +x "$VERIFY" 2>/dev/null || true
+    OUTPUT="$(bash "$VERIFY" 2>&1)"
+  fi
   RESULT_LINE="$(echo "$OUTPUT" | grep -m1 '^RESULT:' || true)"
   REASONS="$(echo "$OUTPUT" | grep '^REASON:' | sed 's/^REASON:[[:space:]]*/  - /')"
 
@@ -231,6 +256,8 @@ echo -e "${CYAN}Tip:${RESET} run 'scripts/run-question.sh <number>' again to ret
 echo "'scripts/finish-test.sh' once more to re-grade the session."
 echo
 
-# Remove the timer file so a new session starts fresh the next time
-# scripts/run-question.sh is run for the first question.
+# Remove the timer file and cached verification results so a new session
+# starts fresh the next time scripts/run-question.sh is run for the first
+# question.
 rm -f "$TIMER_FILE"
+rm -f "$RESULTS_FILE"

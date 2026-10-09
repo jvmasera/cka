@@ -83,14 +83,15 @@ while true; do
   BAR_FULL="$(printf '%0.s#' $(seq 1 "$FILLED" 2>/dev/null))"
   BAR_VOID="$(printf '%0.s-' $(seq 1 "$EMPTY" 2>/dev/null))"
   BAR_RAW="${BAR_FULL}${BAR_VOID}"
-  BAR_WITH_LABEL="$(printf '%*s%s%*s' "$PAD_LEFT" '' "$BAR_LABEL" "$PAD_RIGHT" '')"
   # Overlay the centered label on top of the raw bar characters so the bar
-  # itself still shows the fill/empty proportion around the text.
+  # itself still shows the fill/empty proportion around the text. Only the
+  # padding area (outside the label's own range) falls back to the raw bar
+  # character; any space that is part of the label itself (e.g. between the
+  # time and "left"/"over") is kept as a literal space.
   BAR_DISPLAY=""
   for ((i = 0; i < BAR_WIDTH; i++)); do
-    CH_LABEL="${BAR_WITH_LABEL:$i:1}"
-    if [[ -n "$CH_LABEL" && "$CH_LABEL" != " " ]]; then
-      BAR_DISPLAY+="$CH_LABEL"
+    if [[ "$i" -ge "$PAD_LEFT" && "$i" -lt "$((PAD_LEFT + LABEL_LEN))" ]]; then
+      BAR_DISPLAY+="${BAR_LABEL:$((i - PAD_LEFT)):1}"
     else
       BAR_DISPLAY+="${BAR_RAW:$i:1}"
     fi
