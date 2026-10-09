@@ -67,7 +67,7 @@ spec:
       volumes:
       - name: mariadb-storage
         persistentVolumeClaim:
-          claimName: ""
+          claimName: "mariadb"
 EOF
 
 kubectl apply -f ~/mariadb-deploy.yaml
