@@ -45,18 +45,20 @@ reset_cluster() {
 
   # 2. Resources commonly created in the default namespace
   echo "Cleaning up resources in default namespace..."
-  kubectl delete deploy wordpress web-deployment nginx nginx-static mariadb --namespace default --ignore-not-found || true
-  kubectl delete svc web-service nginx nginx-service mariadb --namespace default --ignore-not-found || true
-  kubectl delete ingress web nginx-ingress --namespace default --ignore-not-found || true
-  kubectl delete secret web-tls --namespace default --ignore-not-found || true
-  kubectl delete pod nginx test-pod --namespace default --ignore-not-found || true
-  kubectl delete pvc mariadb --namespace default --ignore-not-found || true
+  kubectl delete deploy wordpress web-deployment nginx nginx-static mariadb --namespace default --ignore-not-found 2>/dev/null || true
+  kubectl delete svc web-service nginx nginx-service mariadb --namespace default --ignore-not-found 2>/dev/null || true
+  kubectl delete ingress web nginx-ingress --namespace default --ignore-not-found 2>/dev/null || true
+  kubectl delete secret web-tls --namespace default --ignore-not-found 2>/dev/null || true
+  kubectl delete pod nginx test-pod --namespace default --ignore-not-found 2>/dev/null || true
+  kubectl delete pvc mariadb --namespace default --ignore-not-found 2>/dev/null || true
 
   # 3. Cluster-scoped resources created across questions
   echo "Cleaning up cluster-scoped resources..."
-  kubectl delete pv mariadb-pv --ignore-not-found || true
-  kubectl delete priorityclass user-critical high-priority --ignore-not-found || true
-  kubectl delete gatewayclass nginx-class --ignore-not-found || true
+  kubectl delete pv mariadb-pv --ignore-not-found 2>/dev/null || true
+  kubectl delete priorityclass user-critical high-priority --ignore-not-found 2>/dev/null || true
+  if kubectl api-resources | grep -qi gatewayclass; then
+    kubectl delete gatewayclass nginx-class --ignore-not-found 2>/dev/null || true
+  fi
 
   # Remove taints on nodes if applied in Question-10
   kubectl taint nodes --all PERMISSION- 2>/dev/null || true
