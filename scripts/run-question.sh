@@ -14,6 +14,13 @@ if [[ $# -lt 1 ]]; then
   exit 1
 fi
 
+# Always operate from the repo root, regardless of the directory the user
+# was in when invoking this script (e.g. via the global "cka" command from
+# inside "sandbox/" or any other folder), so question directories, the
+# sandbox cleanup and all other relative paths resolve correctly.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
 INPUT="$*"
 QUESTION_DIR=""
 
@@ -52,12 +59,12 @@ SOLUTION="$QUESTION_DIR/SolutionNotes.bash"
 chmod +x "$SETUP"
 
 # When starting a brand new test session (timer not running yet) outside of
-# tmux, automatically open a tmux session with 2 panes split horizontally:
-# the top one running the fixed on-screen timer (show-timer.sh) and the
-# bottom one running this very question (so the whole exam experience -
-# timer + question - is ready in a single tmux session). If we're already
-# inside tmux, or tmux isn't available, just proceed normally below.
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# tmux, automatically open a tmux session with 2 panes split vertically
+# (side by side): the left one running this very question and the right one
+# running the fixed on-screen timer (show-timer.sh), narrower since it
+# doesn't need much width (so the whole exam experience - timer + question -
+# is ready in a single tmux session). If we're already inside tmux, or tmux
+# isn't available, just proceed normally below.
 TIMER_FILE="$REPO_ROOT/scripts/.session_start"
 if [[ -z "${TMUX:-}" && ! -f "$TIMER_FILE" ]] && command -v tmux >/dev/null 2>&1; then
   SESSION_NAME="cka-exam"
@@ -71,16 +78,16 @@ if [[ -z "${TMUX:-}" && ! -f "$TIMER_FILE" ]] && command -v tmux >/dev/null 2>&1
   done
 
   tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
-  tmux new-session -d -s "$SESSION_NAME" -c "$REPO_ROOT" "$SHOW_TIMER"
-  tmux split-window -v -t "$SESSION_NAME" -c "$REPO_ROOT" "$SCRIPT_PATH$ARGS_Q; exec bash"
-  # Keep the timer pane small (it only needs a few lines) and give the
+  tmux new-session -d -s "$SESSION_NAME" -c "$REPO_ROOT" "$SCRIPT_PATH$ARGS_Q; exec bash"
+  tmux split-window -h -t "$SESSION_NAME" -c "$REPO_ROOT" "$SHOW_TIMER"
+  # Keep the timer pane narrow (it only needs a small width) and give the
   # question pane the rest of the screen.
-  tmux resize-pane -t "$SESSION_NAME:0.0" -y 2
+  tmux resize-pane -t "$SESSION_NAME:0.1" -x 30
   # Enable mouse mode and a bigger scrollback buffer so scrolling works
   # inside each pane (e.g. while editing files with vim).
   tmux set-option -t "$SESSION_NAME" -g mouse on
   tmux set-option -t "$SESSION_NAME" -g history-limit 50000
-  tmux select-pane -t "$SESSION_NAME:0.1"
+  tmux select-pane -t "$SESSION_NAME:0.0"
   exec tmux attach-session -t "$SESSION_NAME"
 fi
 
@@ -136,8 +143,7 @@ reset_cluster() {
 
   # 5. Clean up temporary files in root / home and sandbox
   rm -f ~/mariadb-deploy.yaml ~/pvc.yaml ~/pod.yaml ~/hpa.yaml /root/mariadb-deploy.yaml /root/cri-dockerd.deb 2>/dev/null || true
-  
-  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
   if [[ -d "$REPO_ROOT/sandbox" ]]; then
     echo -e "${CYAN}Cleaning up sandbox folder...${RESET}"
     find "$REPO_ROOT/sandbox" -mindepth 1 ! -name '.gitkeep' -delete 2>/dev/null || true
@@ -263,8 +269,8 @@ if [[ ! -f "$TIMER_FILE" ]]; then
   if [[ -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
     PANE_COUNT="$(tmux list-panes 2>/dev/null | wc -l)"
     if [[ "${PANE_COUNT:-1}" -le 1 ]]; then
-      tmux split-window -v -b "$SHOW_TIMER" 2>/dev/null \
-        && tmux resize-pane -U -y 3 2>/dev/null \
+      tmux split-window -h "$SHOW_TIMER" 2>/dev/null \
+        && tmux resize-pane -R -x 30 2>/dev/null \
         && echo -e "${GREEN}==> Timer pane opened automatically (tmux split-window).${RESET}" \
         || echo -e "${YELLOW}==> Could not auto-open the timer pane. Run manually: $SHOW_TIMER${RESET}"
       tmux set-option -g mouse on 2>/dev/null || true
