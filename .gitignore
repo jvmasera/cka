@@ -7,3 +7,4 @@ scripts/.session_pause
 scripts/.session_paused_total
 scripts/.session_resume
 scripts/.session_question
+scripts/.session_question_name

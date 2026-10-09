@@ -65,6 +65,15 @@ chmod +x "$SETUP"
 # created.
 QUESTION_STATE_FILE="$REPO_ROOT/scripts/.session_question"
 cp "$QUESTION_TEXT" "$QUESTION_STATE_FILE"
+echo "$QUESTION_DIR" > "$REPO_ROOT/scripts/.session_question_name"
+
+# If we're already running inside tmux (e.g. this is a subsequent question
+# within an already-open exam session), immediately rename our own pane's
+# title to the current question, so both the question-description pane and
+# this main working pane always show which question is active.
+if [[ -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]]; then
+  tmux select-pane -t "$TMUX_PANE" -T "$QUESTION_DIR" 2>/dev/null || true
+fi
 
 # When starting a brand new test session (timer not running yet) outside of
 # tmux, automatically open a tmux session with 2 panes split horizontally
@@ -103,6 +112,13 @@ if [[ -z "${TMUX:-}" && ! -f "$TIMER_FILE" ]] && command -v tmux >/dev/null 2>&1
   # inside each pane (e.g. while editing files with vim).
   tmux set-option -t "$SESSION_NAME" -g mouse on
   tmux set-option -t "$SESSION_NAME" -g history-limit 50000
+  # Show pane titles (current question) in the border of the question-text
+  # pane and the main working pane, so it's always clear which question you
+  # are on without needing to scroll up.
+  tmux set-option -t "$SESSION_NAME" -g pane-border-status top
+  tmux set-option -t "$SESSION_NAME" -g pane-border-format " #{pane_title} "
+  tmux select-pane -t "$TOP_LEFT_PANE" -T "$QUESTION_DIR"
+  tmux select-pane -t "$BOTTOM_PANE" -T "$QUESTION_DIR"
   tmux select-pane -t "$BOTTOM_PANE"
   exec tmux attach-session -t "$SESSION_NAME"
 fi
@@ -292,6 +308,12 @@ if [[ ! -f "$TIMER_FILE" ]]; then
         tmux resize-pane -t "$TOP_LEFT_PANE" -y 8 2>/dev/null
         TIMER_PANE="$(tmux split-window -h -t "$TOP_LEFT_PANE" -P -F '#{pane_id}' "$SHOW_TIMER" 2>/dev/null)"
         tmux resize-pane -t "$TIMER_PANE" -x 20 2>/dev/null
+        # Show pane titles (current question) in the pane border, so it's
+        # always clear which question is active in both the description
+        # pane and this main working pane.
+        tmux set-option -g pane-border-status top 2>/dev/null || true
+        tmux set-option -g pane-border-format " #{pane_title} " 2>/dev/null || true
+        tmux select-pane -t "$TOP_LEFT_PANE" -T "$QUESTION_DIR" 2>/dev/null || true
         echo -e "${GREEN}==> Question/timer panes opened automatically (tmux split-window).${RESET}"
       else
         echo -e "${YELLOW}==> Could not auto-open the question/timer panes. Run manually: $SHOW_TIMER${RESET}"
