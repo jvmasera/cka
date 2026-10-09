@@ -75,7 +75,7 @@ if [[ -z "${TMUX:-}" && ! -f "$TIMER_FILE" ]] && command -v tmux >/dev/null 2>&1
   tmux split-window -v -t "$SESSION_NAME" -c "$REPO_ROOT" "$SCRIPT_PATH$ARGS_Q; exec bash"
   # Keep the timer pane small (it only needs a few lines) and give the
   # question pane the rest of the screen.
-  tmux resize-pane -t "$SESSION_NAME:0.0" -y 3
+  tmux resize-pane -t "$SESSION_NAME:0.0" -y 2
   # Enable mouse mode and a bigger scrollback buffer so scrolling works
   # inside each pane (e.g. while editing files with vim).
   tmux set-option -t "$SESSION_NAME" -g mouse on
