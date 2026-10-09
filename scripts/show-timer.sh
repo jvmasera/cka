@@ -39,7 +39,7 @@ while true; do
   if [[ ! -f "$TIMER_FILE" ]]; then
     echo
     echo -e "${YELLOW}Waiting for the session to start...${RESET}"
-    echo "Run 'scripts/run-question.sh <number>' to start the timer."
+    echo "Run 'cka <number>' to start the timer."
     sleep 1
     continue
   fi
