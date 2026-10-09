@@ -8,7 +8,7 @@
 # Create a Persistent Volume Claim (PVC) named mariadb in the mariadb namespace with the spec
 # Access Mode = ReadWriteOnce
 # Storage = 250Mi
-# Edit the MariaDb Deployment file located at ~/mariadb-deploy.yaml to use the PVC created in the previous step
+# Edit the MariaDb Deployment file located at ~/cka/sandbox/mariadb-deploy.yaml to use the PVC created in the previous step
 # Apply the updated Deployment file to the cluster
 # Ensure the MariaDB Deployment is running and Stable
 

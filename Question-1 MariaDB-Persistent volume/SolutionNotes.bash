@@ -19,5 +19,5 @@ kubectl get pv mariadb-pv     # should show Bound to mariadb
 # Step 2: ensure deployment uses the PVC
 # mariadb-deploy.yaml should mount claimName: mariadb
 # (LabSetUp.bash leaves claimName blank for practice)
-kubectl apply -f mariadb-deploy.yaml
+kubectl apply -f ~/cka/sandbox/mariadb-deploy.yaml
 kubectl get pods -n mariadb

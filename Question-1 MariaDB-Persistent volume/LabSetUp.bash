@@ -70,7 +70,7 @@ spec:
           claimName: "mariadb"
 EOF
 
-kubectl apply -f ~/mariadb-deploy.yaml
+kubectl apply -f ~/cka/sandbox/mariadb-deploy.yaml
 
 echo "🔹 Waiting for MariaDB pod to start..."
 kubectl wait --for=condition=Available deployment/mariadb -n mariadb --timeout=60s || true
@@ -86,7 +86,7 @@ if [ -n "$claim_ref" ]; then
 fi
 
 # Refresh the deployment manifest for practice: claimName intentionally left blank
-cat <<'EOF' > ~/mariadb-deploy.yaml
+cat <<'EOF' > ~/cka/sandbox/mariadb-deploy.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -120,4 +120,4 @@ EOF
 echo "✅ Lab setup complete!"
 echo "   - PV retained and ready for reuse"
 echo "   - Namespace: mariadb"
-echo "   - Task: recreate PVC and deployment reusing existing PV (fill claimName in ~/mariadb-deploy.yaml)"
+echo "   - Task: recreate PVC and deployment reusing existing PV (fill claimName in ~/cka/sandbox/mariadb-deploy.yaml)"
