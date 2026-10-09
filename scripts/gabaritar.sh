@@ -13,7 +13,8 @@
 # finish-test.sh to confirm everything still grades correctly end-to-end.
 #
 # Usage:
-#   scripts/gabaritar.sh          (or: cka gabaritar)
+#   scripts/gabaritar.sh          (or: cka gabaritar)        -> solves ALL questions
+#   scripts/gabaritar.sh <number>  (or: cka gabaritar <number>) -> solves and grades ONLY that question
 
 set -uo pipefail
 
@@ -39,16 +40,44 @@ fi
 # Collect all question directories, sorted numerically by their "Question-N"
 # prefix (so Question-2 runs before Question-10, etc), exactly like
 # finish-test.sh does when listing the full exam.
-mapfile -t QUESTION_DIRS < <(find "$REPO_ROOT" -maxdepth 1 -mindepth 1 -type d -name 'Question-*' -printf '%f\n' \
+mapfile -t ALL_QUESTION_DIRS < <(find "$REPO_ROOT" -maxdepth 1 -mindepth 1 -type d -name 'Question-*' -printf '%f\n' \
   | sed -E 's/^Question-([0-9]+)/\1\t&/' | sort -n -k1 | cut -f2-)
 
-if [[ ${#QUESTION_DIRS[@]} -eq 0 ]]; then
+if [[ ${#ALL_QUESTION_DIRS[@]} -eq 0 ]]; then
   echo -e "${RED}No Question-* directories found.${RESET}" >&2
   exit 1
 fi
 
-echo -e "${BOLD}${BLUE}==> cka gabaritar: solving all ${#QUESTION_DIRS[@]} questions with their own SolutionNotes.bash, then running finish-test.sh${RESET}"
-echo -e "${YELLOW}This is meant to sanity-check Verify.bash + the session cache; a correct run should score 100%.${RESET}"
+# If a specific question number (or full directory name) is given as an
+# argument, restrict this run to just that single question instead of the
+# whole exam, e.g. "cka gabaritar 15" solves and grades only Question-15.
+SINGLE_ARG="${1:-}"
+QUESTION_DIRS=()
+if [[ -n "$SINGLE_ARG" ]]; then
+  for dir in "${ALL_QUESTION_DIRS[@]}"; do
+    if [[ "$SINGLE_ARG" =~ ^[0-9]+$ ]]; then
+      if [[ "$dir" =~ ^Question-${SINGLE_ARG}([[:space:]]|-|$) ]]; then
+        QUESTION_DIRS+=("$dir")
+      fi
+    elif [[ "$dir" == "$SINGLE_ARG" ]]; then
+      QUESTION_DIRS+=("$dir")
+    fi
+  done
+  if [[ ${#QUESTION_DIRS[@]} -eq 0 ]]; then
+    echo -e "${RED}No question directory found matching '$SINGLE_ARG'.${RESET}" >&2
+    exit 1
+  fi
+else
+  QUESTION_DIRS=("${ALL_QUESTION_DIRS[@]}")
+fi
+
+if [[ ${#QUESTION_DIRS[@]} -eq ${#ALL_QUESTION_DIRS[@]} ]]; then
+  echo -e "${BOLD}${BLUE}==> cka gabaritar: solving all ${#QUESTION_DIRS[@]} questions with their own SolutionNotes.bash, then running finish-test.sh${RESET}"
+  echo -e "${YELLOW}This is meant to sanity-check Verify.bash + the session cache; a correct run should score 100%.${RESET}"
+else
+  echo -e "${BOLD}${BLUE}==> cka gabaritar: solving only '${QUESTION_DIRS[0]}' with its own SolutionNotes.bash, then running finish-test.sh${RESET}"
+  echo -e "${YELLOW}Note: finish-test.sh always grades over all 17 exam questions, so any question not solved in this run will still count as 'Not attempted'.${RESET}"
+fi
 echo
 
 # Start a brand new test session, so this run doesn't mix with (or get
