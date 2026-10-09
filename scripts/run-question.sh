@@ -58,38 +58,47 @@ SOLUTION="$QUESTION_DIR/SolutionNotes.bash"
 
 chmod +x "$SETUP"
 
+# Keep a copy of the current question's text in a session-state file, so the
+# dedicated tmux pane running show-question.sh can automatically refresh its
+# content every time a new question is started in this same session, instead
+# of staying stuck on whichever question was active when the pane was first
+# created.
+QUESTION_STATE_FILE="$REPO_ROOT/scripts/.session_question"
+cp "$QUESTION_TEXT" "$QUESTION_STATE_FILE"
+
 # When starting a brand new test session (timer not running yet) outside of
 # tmux, automatically open a tmux session with 2 panes split horizontally
-# (top/bottom), like before. The difference is that the top pane is now
+# (top/bottom): the bottom one (the biggest, since it's where you'll actually
+# run commands) keeps running this very question, while the top row is
 # itself split vertically (side by side) into: the question's descriptive
-# text on the left, and the fixed on-screen timer (show-timer.sh) on the
-# right with a smaller width. The bottom pane keeps running this very
-# question (the interactive shell). If we're already inside tmux, or tmux
-# isn't available, just proceed normally below.
+# text on the left (wide, auto-refreshing via show-question.sh) and the
+# fixed on-screen timer (show-timer.sh) on the right with a smaller width.
+# If we're already inside tmux, or tmux isn't available, just proceed
+# normally below.
 TIMER_FILE="$REPO_ROOT/scripts/.session_start"
 if [[ -z "${TMUX:-}" && ! -f "$TIMER_FILE" ]] && command -v tmux >/dev/null 2>&1; then
   SESSION_NAME="cka-exam"
   SCRIPT_PATH="$REPO_ROOT/scripts/run-question.sh"
   SHOW_TIMER="$REPO_ROOT/scripts/show-timer.sh"
-  chmod +x "$SCRIPT_PATH" "$SHOW_TIMER" 2>/dev/null || true
+  SHOW_QUESTION="$REPO_ROOT/scripts/show-question.sh"
+  chmod +x "$SCRIPT_PATH" "$SHOW_TIMER" "$SHOW_QUESTION" 2>/dev/null || true
 
   ARGS_Q=""
   for a in "$@"; do
     ARGS_Q+=" $(printf '%q' "$a")"
   done
 
-  SHOW_QUESTION_CMD="cat $(printf '%q' "$REPO_ROOT/$QUESTION_TEXT"); echo; echo 'Press Ctrl+C to close.'; exec bash"
-
   tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
-  # Top-left pane: static question text.
-  tmux new-session -d -s "$SESSION_NAME" -c "$REPO_ROOT" "$SHOW_QUESTION_CMD"
+  # Top-left pane: auto-refreshing question text.
+  tmux new-session -d -s "$SESSION_NAME" -c "$REPO_ROOT" "$SHOW_QUESTION"
   TOP_LEFT_PANE="$(tmux display-message -p -t "$SESSION_NAME" '#{pane_id}')"
-  # Bottom pane: the actual interactive shell running the question.
+  # Bottom pane: the actual interactive shell running the question. This is
+  # the main working area, so it gets most of the screen height.
   BOTTOM_PANE="$(tmux split-window -v -t "$SESSION_NAME" -c "$REPO_ROOT" -P -F '#{pane_id}' "$SCRIPT_PATH$ARGS_Q; exec bash")"
   # Top-right pane: the fixed on-screen timer, narrower than the question pane.
   TIMER_PANE="$(tmux split-window -h -t "$TOP_LEFT_PANE" -c "$REPO_ROOT" -P -F '#{pane_id}' "$SHOW_TIMER")"
-  tmux resize-pane -t "$TOP_LEFT_PANE" -y 12
-  tmux resize-pane -t "$TIMER_PANE" -x 30
+  tmux resize-pane -t "$TOP_LEFT_PANE" -y 8
+  tmux resize-pane -t "$TIMER_PANE" -x 20
   # Enable mouse mode and a bigger scrollback buffer so scrolling works
   # inside each pane (e.g. while editing files with vim).
   tmux set-option -t "$SESSION_NAME" -g mouse on
@@ -273,16 +282,16 @@ if [[ ! -f "$TIMER_FILE" ]]; then
   # inside a tmux window with 2+ panes, assume this was already set up
   # (e.g. by the auto-launched session above) and skip creating another one.
   SHOW_TIMER="$REPO_ROOT/scripts/show-timer.sh"
-  chmod +x "$SHOW_TIMER" 2>/dev/null || true
+  SHOW_QUESTION="$REPO_ROOT/scripts/show-question.sh"
+  chmod +x "$SHOW_TIMER" "$SHOW_QUESTION" 2>/dev/null || true
   if [[ -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
     PANE_COUNT="$(tmux list-panes 2>/dev/null | wc -l)"
     if [[ "${PANE_COUNT:-1}" -le 1 ]]; then
-      SHOW_QUESTION_CMD="cat $(printf '%q' "$REPO_ROOT/$QUESTION_TEXT"); echo; echo 'Press Ctrl+C to close.'; exec bash"
-      TOP_LEFT_PANE="$(tmux split-window -v -b -P -F '#{pane_id}' "$SHOW_QUESTION_CMD" 2>/dev/null)"
+      TOP_LEFT_PANE="$(tmux split-window -v -b -P -F '#{pane_id}' "$SHOW_QUESTION" 2>/dev/null)"
       if [[ -n "$TOP_LEFT_PANE" ]]; then
-        tmux resize-pane -t "$TOP_LEFT_PANE" -y 12 2>/dev/null
+        tmux resize-pane -t "$TOP_LEFT_PANE" -y 8 2>/dev/null
         TIMER_PANE="$(tmux split-window -h -t "$TOP_LEFT_PANE" -P -F '#{pane_id}' "$SHOW_TIMER" 2>/dev/null)"
-        tmux resize-pane -t "$TIMER_PANE" -x 30 2>/dev/null
+        tmux resize-pane -t "$TIMER_PANE" -x 20 2>/dev/null
         echo -e "${GREEN}==> Question/timer panes opened automatically (tmux split-window).${RESET}"
       else
         echo -e "${YELLOW}==> Could not auto-open the question/timer panes. Run manually: $SHOW_TIMER${RESET}"
