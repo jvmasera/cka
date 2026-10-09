@@ -73,7 +73,7 @@ spec:
   - Ingress
 EOF
 
-cat <<EOF > network-policy-2.yaml
+cat <<EOF > network-policy-3.yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -97,7 +97,7 @@ spec:
   - Ingress
 EOF
 
-cat <<EOF > network-policy-3.yaml
+cat <<EOF > network-policy-2.yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
