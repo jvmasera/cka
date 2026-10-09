@@ -59,7 +59,7 @@ spec:
       - name: mariadb
         image: mariadb:10.6
         env:
-        - name: MYSQL_ROOT_PASSWORD
+        - name: MARIADB_ROOT_PASSWORD
           value: rootpass
         volumeMounts:
         - name: mariadb-storage
@@ -106,7 +106,7 @@ spec:
       - name: mariadb
         image: mariadb:10.6
         env:
-        - name: MYSQL_ROOT_PASSWORD
+        - name: MARIADB_ROOT_PASSWORD
           value: rootpass
         volumeMounts:
         - name: mariadb-storage
