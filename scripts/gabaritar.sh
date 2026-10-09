@@ -55,6 +55,16 @@ echo
 # polluted by) any previous practice session's log/cache/timer.
 export NEW_TEST_SESSION=1
 
+# Always skip run-question.sh's auto-tmux launch here, even when this script
+# is itself run from a real terminal. That auto-launch "exec"s into
+# "tmux attach-session", replacing the current process and leaving the
+# actual reset/setup/logging to happen asynchronously inside a separate
+# detached tmux pane - which races against this very loop immediately
+# moving on to apply SolutionNotes.bash before LabSetUp.bash has finished
+# (or even started). CKA_NO_TMUX forces run-question.sh to always execute
+# everything inline and synchronously instead.
+export CKA_NO_TMUX=1
+
 FAILED_TO_APPLY=()
 
 for QUESTION_DIR in "${QUESTION_DIRS[@]}"; do

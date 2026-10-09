@@ -82,10 +82,24 @@ fi
 # itself split vertically (side by side) into: the question's descriptive
 # text on the left (wide, auto-refreshing via show-question.sh) and the
 # fixed on-screen timer (show-timer.sh) on the right with a smaller width.
-# If we're already inside tmux, or tmux isn't available, just proceed
-# normally below.
+# If we're already inside tmux, tmux isn't available, we're not attached to
+# a real terminal, or we were explicitly told to skip it (CKA_NO_TMUX=1, set
+# by "scripts/gabaritar.sh"), just proceed normally below. Two separate
+# problems made this necessary:
+# 1. Without the "-t 1" check, "tmux new-session"/"attach-session" fail with
+#    "open terminal failed: not a terminal" under "set -e", aborting this
+#    whole script before ever running LabSetUp.bash (seen when driven from
+#    a non-tty automation context).
+# 2. Even with a real tty attached (e.g. gabaritar.sh run from an actual
+#    terminal), "exec tmux attach-session" replaces *this* process: the
+#    reset/setup/logging below would then only happen inside the detached
+#    tmux pane's separate background process, not in the caller that is
+#    synchronously waiting for this script to return - causing a race where
+#    gabaritar.sh moves on to apply SolutionNotes.bash before LabSetUp.bash
+#    even started. CKA_NO_TMUX=1 guarantees this script always runs setup
+#    inline, synchronously, regardless of the terminal being attached.
 TIMER_FILE="$REPO_ROOT/scripts/.session_start"
-if [[ -z "${TMUX:-}" && ! -f "$TIMER_FILE" ]] && command -v tmux >/dev/null 2>&1; then
+if [[ -z "${TMUX:-}" && ! -f "$TIMER_FILE" && -t 1 && -z "${CKA_NO_TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
   SESSION_NAME="cka-exam"
   SCRIPT_PATH="$REPO_ROOT/scripts/run-question.sh"
   SHOW_TIMER="$REPO_ROOT/scripts/show-timer.sh"
