@@ -1,5 +1,5 @@
-# Create PriorityClass just below existing max (e.g., 999)
-kubectl create priorityclass high-priority --value=999 --description="high priority"
+# Create PriorityClass just below existing max (e.g., user-critical is 1000000000, so 999999999)
+kubectl create priorityclass high-priority --value=999999999 --description="high priority"
 kubectl get pc
 
 # Patch deployment to use it

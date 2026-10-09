@@ -10,7 +10,7 @@ apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
   name: user-critical
-value: 1000
+value: 1000000000
 globalDefault: false
 description: "Highest user-defined priority class"
 EOF
