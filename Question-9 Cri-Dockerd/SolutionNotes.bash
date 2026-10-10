@@ -1,7 +1,16 @@
 # Install and run cri-dockerd
-sudo dpkg -i cri-dockerd.deb
+# Use the absolute path, since LabSetUp.bash always downloads the package to
+# /root/cri-dockerd.deb, regardless of the directory this script is run from
+# (e.g. ~/cka/sandbox).
+sudo dpkg -i /root/cri-dockerd.deb
+sudo systemctl daemon-reload
 sudo systemctl enable --now cri-docker.service
-sudo systemctl status cri-docker.service
+# Give systemd a brief moment to actually bring the service up before
+# checking its status, so an immediate verification right after this script
+# doesn't catch it mid-start and report a false failure.
+sleep 2
+sudo systemctl status cri-docker.service --no-pager || true
+sudo systemctl is-active cri-docker.service
 
 # Set sysctl (make persistent)
 sudo tee /etc/sysctl.d/kube.conf >/dev/null <<'EOF'
