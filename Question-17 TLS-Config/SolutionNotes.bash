@@ -2,7 +2,33 @@
 # We want to edit the config map to only support TLSv1.2 and make it immutable
 # Note: In Kubernetes, you can set `immutable: true` on the ConfigMap.
 # If modifying an existing ConfigMap, you can update `ssl_protocols TLSv1.2;` and add `immutable: true`.
-k edit cm -n nginx-static nginx-config 
+# ConfigMaps don't support "kubectl patch"/"kubectl edit" for the `immutable`
+# field together with data changes in every version, and "kubectl edit" is
+# interactive (hangs when this script runs unattended, e.g. via "cka
+# gabaritar"). Since the ConfigMap is not yet immutable, it can still be
+# replaced in-place with "kubectl apply" using the full desired manifest:
+cat <<'EOF' | k apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: nginx-static
+immutable: true
+data:
+  nginx.conf: |
+    events {}
+    http {
+      server {
+        listen 443 ssl;
+        ssl_certificate /etc/nginx/tls/tls.crt;
+        ssl_certificate_key /etc/nginx/tls/tls.key;
+        ssl_protocols TLSv1.2;
+        location / {
+          return 200 "Hello TLS\n";
+        }
+      }
+    }
+EOF
 # Under metadata/data:
 # 1. Update ssl_protocols to only TLSv1.2:
 #        ssl_protocols TLSv1.2;
